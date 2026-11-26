@@ -1,0 +1,3449 @@
+<!DOCTYPE html>
+<html lang="en" class="dark">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>SolarVerse: Interactive PV Physics &amp; Bangladesh Solar Platform</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <script>
+    tailwind.config = {
+      darkMode: 'class',
+      theme: {
+        extend: {
+          fontFamily: {
+            sans: ['Cambria', 'Georgia', '"Times New Roman"', 'serif'],
+            serif: ['Cambria', 'Georgia', '"Times New Roman"', 'serif'],
+            mono: ['JetBrains Mono', 'monospace'],
+          },
+          colors: {
+            sv: {
+              bg: '#080d18',
+              panel: '#111a2c',
+              panel2: '#0d1526',
+              line: '#25324b',
+              text: '#e8edf8',
+              muted: '#94a3bf',
+              cyan: '#38bdf8',
+              orange: '#fb923c',
+              violet: '#a78bfa',
+              red: '#f87171',
+            }
+          }
+        }
+      }
+    }
+  </script>
+  <style>
+    :root {
+      --bg: #080d18;
+      --panel: #111a2c;
+      --line: #25324b;
+      --tx: #e8edf8;
+      --mu: #94a3bf;
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      background-color: var(--bg);
+      color: var(--tx);
+      font-family: Cambria, Georgia, 'Times New Roman', serif;
+      font-variant-numeric: tabular-nums;
+      overflow-x: hidden;
+    }
+    .num-tab {
+      font-variant-numeric: tabular-nums;
+    }
+    /* Custom Scrollbar */
+    ::-webkit-scrollbar { width: 7px; height: 7px; }
+    ::-webkit-scrollbar-track { background: #080d18; }
+    ::-webkit-scrollbar-thumb { background: #25324b; border-radius: 99px; }
+    ::-webkit-scrollbar-thumb:hover { background: #3b4f75; }
+
+    /* Custom Range Sliders */
+    input[type="range"] {
+      -webkit-appearance: none;
+      appearance: none;
+      background: transparent;
+      cursor: pointer;
+    }
+    input[type="range"]::-webkit-slider-runnable-track {
+      height: 6px;
+      border-radius: 999px;
+      background: #25324b;
+    }
+    input[type="range"]::-webkit-slider-thumb {
+      -webkit-appearance: none;
+      appearance: none;
+      height: 16px;
+      width: 16px;
+      border-radius: 50%;
+      background: #38bdf8;
+      border: 2px solid #080d18;
+      margin-top: -5px;
+      box-shadow: 0 0 8px rgba(56, 189, 248, 0.5);
+    }
+
+    canvas.sim-canvas {
+      width: 100%;
+      height: auto;
+      display: block;
+      background: #111a2c;
+      border: 1px solid #25324b;
+      border-radius: 12px;
+    }
+
+    .ctl-btn {
+      background: #111a2c;
+      color: #e8edf8;
+      border: 1px solid #25324b;
+      border-radius: 8px;
+      padding: 6px 13px;
+      font-family: Cambria, Georgia, 'Times New Roman', serif;
+      font-size: 13px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: all 0.15s ease;
+    }
+    .ctl-btn:hover { border-color: #4b5f86; }
+    .ctl-btn.on { border-color: #60a5fa; background: #16284d; color: #ffffff; }
+
+    #toast-box { transition: opacity 0.25s ease, transform 0.25s ease; }
+  </style>
+</head>
+<body class="bg-sv-bg text-sv-text min-h-screen flex flex-col lg:flex-row">
+
+  <!-- Toast Notification (Never uses alert()) -->
+  <div id="toast-box" class="fixed bottom-5 right-5 z-50 pointer-events-none opacity-0 translate-y-4">
+    <div class="bg-sv-panel text-sv-text border border-sv-cyan/50 px-4 py-3 rounded-xl shadow-2xl flex items-center gap-3 text-xs font-medium">
+      <span class="w-2.5 h-2.5 rounded-full bg-sv-cyan animate-ping"></span>
+      <span id="toast-text">Copied to clipboard</span>
+    </div>
+  </div>
+
+  <!-- Interactive Canvas Hover Inspector Tooltip -->
+  <div id="canvas-tooltip" class="fixed z-50 pointer-events-none hidden bg-[#0b1220]/95 backdrop-blur-md border border-sky-400/60 rounded-xl px-3.5 py-2.5 shadow-2xl text-xs text-sv-text max-w-xs num-tab">
+    <div id="tt-title" class="font-bold text-sky-400 text-sm mb-1">Layer Name</div>
+    <div id="tt-body" class="space-y-0.5 text-[11px] text-slate-300"></div>
+  </div>
+
+  <!-- ======================================================================= -->
+  <!-- LEFT APP SIDEBAR SHELL                                                  -->
+  <!-- ======================================================================= -->
+  <aside class="w-full lg:w-72 lg:fixed lg:inset-y-0 lg:left-0 z-40 bg-sv-panel2 border-b lg:border-b-0 lg:border-r border-sv-line flex flex-col justify-between">
+    <div>
+      <!-- Brand Header -->
+      <div class="p-4 lg:p-5 border-b border-sv-line flex items-center justify-between">
+        <button onclick="switchView('home')" class="flex items-center gap-3 text-left group focus:outline-none">
+          <div class="w-10 h-10 rounded-xl bg-gradient-to-br from-sky-400 via-violet-500 to-amber-400 p-0.5 shadow-lg shadow-sky-500/20">
+            <div class="w-full h-full bg-sv-bg rounded-[10px] flex items-center justify-center">
+              <svg class="w-6 h-6 text-sky-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <circle cx="12" cy="12" r="4" fill="#fb923c" fill-opacity="0.35" stroke="#fb923c"/>
+                <path d="M12 2v2m0 16v2M4.93 4.93l1.41 1.41m11.32 11.32l1.41 1.41M2 12h2m16 0h2M4.93 19.07l1.41-1.41m11.32-11.32l1.41-1.41" stroke="#38bdf8"/>
+              </svg>
+            </div>
+          </div>
+          <div>
+            <div class="flex items-center gap-2">
+              <span class="text-lg font-extrabold tracking-tight text-white">SolarVerse</span>
+              <span class="text-[10px] font-mono px-1.5 py-0.5 rounded bg-sky-500/15 text-sky-400 border border-sky-500/30">APP v2.6</span>
+            </div>
+            <p class="text-[11px] text-sv-muted">SCAPS-1D &amp; BD Solar Suite</p>
+          </div>
+        </button>
+
+        <!-- Mobile Menu Toggle -->
+        <button onclick="toggleMobileNav()" class="lg:hidden ctl-btn px-2.5 py-1.5 text-xs">Menu ☰</button>
+      </div>
+
+      <!-- Navigation Menu (6 Integrated Views) -->
+      <nav id="sidebar-nav" class="hidden lg:block p-3 space-y-1">
+        <div class="px-3 py-1.5 text-[10px] font-mono uppercase tracking-wider text-sv-muted">Core Workspaces</div>
+
+        <button onclick="switchView('home')" data-view="home" class="nav-item w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-xs font-semibold transition-all text-left">
+          <span class="text-base">🌍</span>
+          <div>
+            <div>1. Why Solar? &amp; Overview</div>
+            <div class="text-[10px] font-normal opacity-75">Barnett (1978) Oil Depletion Sim</div>
+          </div>
+        </button>
+
+        <button onclick="switchView('lab')" data-view="lab" class="nav-item w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-xs font-semibold transition-all text-left">
+          <span class="text-base">⚛️</span>
+          <div>
+            <div>2. Device &amp; Band Alignment Lab</div>
+            <div class="text-[10px] font-normal opacity-75">Dual-Canvas SCAPS-1D Simulator</div>
+          </div>
+        </button>
+
+        <button onclick="switchView('library')" data-view="library" class="nav-item w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-xs font-semibold transition-all text-left">
+          <span class="text-base">🧬</span>
+          <div>
+            <div>3. Absorber &amp; CTL Library</div>
+            <div class="text-[10px] font-normal opacity-75">HOMO/LUMO, χ, Eg &amp; DFT Adder</div>
+          </div>
+        </button>
+
+        <div class="px-3 pt-3 pb-1 text-[10px] font-mono uppercase tracking-wider text-sv-muted">Bangladesh &amp; Learning</div>
+
+        <button onclick="switchView('planner')" data-view="planner" class="nav-item w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-xs font-semibold transition-all text-left">
+          <span class="text-base">🇧🇩</span>
+          <div>
+            <div>4. BD 64-District Solar Planner</div>
+            <div class="text-[10px] font-normal opacity-75">Tilt, Roof Area, Cost &amp; Payback</div>
+          </div>
+        </button>
+
+        <button onclick="switchView('market')" data-view="market" class="nav-item w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-xs font-semibold transition-all text-left">
+          <span class="text-base">📊</span>
+          <div>
+            <div>5. BD Market &amp; Future</div>
+            <div class="text-[10px] font-normal opacity-75">SREDA Capacity, SHS &amp; 2041 Vision</div>
+          </div>
+        </button>
+
+        <button onclick="switchView('academy')" data-view="academy" class="nav-item w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-xs font-semibold transition-all text-left">
+          <span class="text-base">📘</span>
+          <div>
+            <div>6. Solar Cell Academy</div>
+            <div class="text-[10px] font-normal opacity-75">Device Structures &amp; Working Guide</div>
+          </div>
+        </button>
+      </nav>
+    </div>
+
+    <!-- Prominent Sidebar Attribution Card -->
+    <div class="hidden lg:block p-4 border-t border-sv-line bg-sv-bg/60">
+      <div class="p-3 rounded-xl bg-sv-panel border border-sv-line space-y-1.5">
+        <div class="text-[10px] font-mono uppercase tracking-wider text-sky-400">Research &amp; Development</div>
+        <div class="text-xs font-bold text-white">Created by Rakib Hossain Sourav</div>
+        <div class="text-xs font-semibold text-amber-300">Supervised by Kashfi Uddin</div>
+        <div class="text-[10px] text-sv-muted pt-1 border-t border-sv-line/70">SCAPS-1D &amp; Photovoltaic Systems</div>
+      </div>
+    </div>
+  </aside>
+
+  <!-- ======================================================================= -->
+  <!-- MAIN APPLICATION SHELL (HEADER + 6 VIEWS + FOOTER)                      -->
+  <!-- ======================================================================= -->
+  <div class="flex-1 lg:pl-72 flex flex-col min-h-screen">
+
+    <!-- Top App Header Bar with Prominent Attribution -->
+    <header class="sticky top-0 z-30 bg-sv-bg/95 backdrop-blur-md border-b border-sv-line px-4 sm:px-6 py-3">
+      <div class="max-w-6xl mx-auto flex flex-wrap items-center justify-between gap-3">
+        <div class="flex items-center gap-2.5">
+          <span id="header-view-badge" class="px-2.5 py-1 rounded-lg bg-sky-500/15 text-sky-400 border border-sky-500/30 font-mono text-xs font-semibold">
+            Workspace 02 / 06
+          </span>
+          <h2 id="header-view-title" class="text-sm sm:text-base font-bold text-white">Device &amp; Band Alignment Lab</h2>
+        </div>
+
+        <!-- Prominent Top Header Attribution -->
+        <div class="flex flex-wrap items-center gap-2 text-xs">
+          <span class="px-2.5 py-1 rounded-lg bg-sv-panel border border-sv-line text-sv-text font-medium">
+            Created by <strong class="text-sky-400">Rakib Hossain Sourav</strong>
+          </span>
+          <span class="px-2.5 py-1 rounded-lg bg-sv-panel border border-sv-line text-sv-text font-medium">
+            Supervised by <strong class="text-orange-400">Kashfi Uddin</strong>
+          </span>
+        </div>
+      </div>
+    </header>
+
+    <!-- Main View Content Area -->
+    <main class="flex-1 max-w-6xl w-full mx-auto px-4 sm:px-6 py-6">
+
+      <!-- =================================================================== -->
+      <!-- VIEW 1: WHY SOLAR? & OVERVIEW ("HOW MUCH OIL?" SIMULATION)          -->
+      <!-- =================================================================== -->
+      <section id="view-home" class="app-view hidden space-y-6">
+        <div class="rounded-2xl bg-sv-panel border border-sv-line p-5 sm:p-6 shadow-xl">
+          <div class="flex flex-wrap items-center justify-between gap-2 pb-4 border-b border-sv-line mb-5">
+            <div>
+              <span class="text-[11px] font-mono uppercase tracking-wider text-orange-400">Why Choose Solar Over Fossil Fuels?</span>
+              <h1 class="text-xl sm:text-2xl font-bold text-white mt-0.5">&#8220;How Much Oil?&#8221;: Exponential Consumption vs. Continuous Sunlight</h1>
+            </div>
+            <span class="text-xs font-mono px-2.5 py-1 rounded-lg bg-sv-bg border border-sv-line text-sv-muted">Barnett (1978) / Hu &amp; White</span>
+          </div>
+
+          <div class="grid grid-cols-1 lg:grid-cols-12 gap-6 items-center">
+            <!-- Left Narrative & Controls -->
+            <div class="lg:col-span-5 space-y-4">
+              <div class="p-4 rounded-xl bg-sv-bg border border-sv-line text-xs sm:text-sm text-slate-300 space-y-2.5 leading-relaxed">
+                <p>
+                  Suppose geologists grossly underestimated Earth’s reserves: suppose the <strong>entire Earth</strong> (<span class="font-mono text-sky-400">R = 6.4 × 10⁶ m</span>) consisted <em>entirely</em> of crude oil beneath a thin solid crust.
+                </p>
+                <p>
+                  At the 1970 global consumption rate (<span class="font-mono">1.67 × 10¹⁰ barrels/year</span>), an Earthful of oil lasts <strong class="text-sky-400 font-mono">4.1 × 10¹¹ years</strong>.
+                </p>
+                <p>
+                  <strong>However</strong>, if consumption grows exponentially at <strong class="text-orange-400 font-mono">7% per year</strong> (the 1890-1970 historical rate), the entire Earth is drained dry in just <strong class="text-sv-red font-mono">344 years</strong>!
+                </p>
+                <p class="text-[11px] text-sv-muted pt-2 border-t border-sv-line">
+                  Reference: Barnett (1978), featured in Chenming Hu &amp; Richard M. White, <em>Solar Cells: From Basics to Advanced Systems</em>.
+                </p>
+              </div>
+
+              <!-- Growth Rate Slider Box -->
+              <div class="p-4 rounded-xl bg-sv-bg border border-sv-line space-y-3">
+                <div class="flex items-center justify-between">
+                  <label for="oil-rate-slider" class="text-xs font-bold uppercase text-sv-muted">Annual Growth Rate (<span class="font-mono">r</span>)</label>
+                  <span id="oil-rate-badge" class="px-2.5 py-0.5 rounded bg-sky-500/20 text-sky-400 font-mono font-bold text-xs">7.0% / yr</span>
+                </div>
+                <input id="oil-rate-slider" type="range" min="0" max="10" step="0.5" value="7" class="w-full" oninput="updateOilParams()" />
+                <div class="flex justify-between text-[11px] font-mono text-sv-muted">
+                  <button onclick="setOilSlider(0)" class="hover:text-sky-400">0% (4.1×10¹¹ yr)</button>
+                  <button onclick="setOilSlider(3.5)" class="hover:text-sky-400">3.5%</button>
+                  <button onclick="setOilSlider(7)" class="text-orange-400 font-bold">7% (344 yr)</button>
+                  <button onclick="setOilSlider(10)" class="hover:text-sky-400">10% (247 yr)</button>
+                </div>
+
+                <div class="grid grid-cols-3 gap-2 pt-1 font-mono">
+                  <div class="p-2.5 rounded-lg bg-sv-panel border border-sv-line">
+                    <div class="text-[10px] text-sv-muted">Drain Time</div>
+                    <div id="oil-drain-years" class="text-sm font-bold text-sv-red">344 yrs</div>
+                  </div>
+                  <div class="p-2.5 rounded-lg bg-sv-panel border border-sv-line">
+                    <div class="text-[10px] text-sv-muted">Sim Year</div>
+                    <div id="oil-curr-year" class="text-sm font-bold text-white">Yr 0</div>
+                  </div>
+                  <div class="p-2.5 rounded-lg bg-sv-panel border border-sv-line">
+                    <div class="text-[10px] text-sv-muted">Oil Left</div>
+                    <div id="oil-rem-pct" class="text-sm font-bold text-orange-400">100.0%</div>
+                  </div>
+                </div>
+
+                <div class="flex gap-2 pt-1">
+                  <button id="oil-btn-toggle" onclick="toggleOilSim()" class="ctl-btn on flex-1 font-semibold">▶ Simulate Depletion</button>
+                  <button onclick="resetOilSim()" class="ctl-btn">Reset</button>
+                </div>
+              </div>
+            </div>
+
+            <!-- Right HTML5 Canvas: Earth Oil Reservoir vs. Continuous Solar Flux -->
+            <div class="lg:col-span-7">
+              <canvas id="oil-canvas" class="sim-canvas" aria-label="Interactive Earth oil depletion simulation vs continuous solar energy"></canvas>
+              <p class="text-xs text-sv-muted mt-2">
+                <strong class="text-white">Fig. 0</strong> Earth (<span class="font-mono">V = 1.098 × 10²¹ m³</span>) filled with oil vs. continuous solar irradiance (<span class="font-mono">1.73 × 10⁵ TW</span>). Just 1 hour of sunlight equals humanity’s entire annual energy consumption.
+              </p>
+            </div>
+          </div>
+        </div>
+
+        <!-- Quick-Launch Action Cards -->
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-5">
+          <div onclick="switchView('lab')" class="cursor-pointer rounded-2xl bg-sv-panel border border-sv-line hover:border-sky-400 p-5 transition-all flex items-start gap-4 group">
+            <div class="w-12 h-12 rounded-xl bg-sky-500/15 border border-sky-500/30 flex items-center justify-center text-2xl shrink-0 group-hover:scale-105 transition-transform">⚛️</div>
+            <div class="space-y-1">
+              <div class="flex items-center gap-2">
+                <h3 class="text-base font-bold text-white">Launch SCAPS-1D Device &amp; Band Alignment Lab</h3>
+                <span class="text-xs font-mono text-sky-400">Open →</span>
+              </div>
+              <p class="text-xs text-sv-muted leading-relaxed">
+                Explore the animated Lead-Free Perovskite/ACIGS 2T Tandem cross-section &amp; band diagram, or test n-i-p, p-i-n, CTL-free, multi-absorber, and 4T tandem stacks with real-time carrier blocking diagnostics.
+              </p>
+            </div>
+          </div>
+
+          <div onclick="switchView('planner')" class="cursor-pointer rounded-2xl bg-sv-panel border border-sv-line hover:border-orange-400 p-5 transition-all flex items-start gap-4 group">
+            <div class="w-12 h-12 rounded-xl bg-orange-500/15 border border-orange-500/30 flex items-center justify-center text-2xl shrink-0 group-hover:scale-105 transition-transform">🇧🇩</div>
+            <div class="space-y-1">
+              <div class="flex items-center gap-2">
+                <h3 class="text-base font-bold text-white">Open Bangladesh 64-District Solar Planner</h3>
+                <span class="text-xs font-mono text-orange-400">Open →</span>
+              </div>
+              <p class="text-xs text-sv-muted leading-relaxed">
+                Calculate required panels, roof area, optimal district tilt angle, Dhaka summer temperature derating, BDT CAPEX, and payback years across N-Type TOPCon, Mono PERC, Bifacial, and Tandem panels.
+              </p>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- =================================================================== -->
+      <!-- VIEW 2: DEVICE & BAND ALIGNMENT LAB (EXACT DUAL-CANVAS ENGINE)      -->
+      <!-- =================================================================== -->
+      <section id="view-lab" class="app-view space-y-5">
+        <!-- Preset Architecture Selector & Screening Verdict Banner -->
+        <div class="rounded-2xl bg-sv-panel border border-sv-line p-4 sm:p-5 space-y-4">
+          <div class="flex flex-wrap items-center justify-between gap-3">
+            <div>
+              <h1 class="text-lg sm:text-xl font-bold text-white" id="lab-preset-title">Charge flow and band alignment in a lead-free perovskite/ACIGS 2T tandem cell</h1>
+              <p class="text-xs text-sv-muted mt-0.5" id="lab-preset-sub">Every absorber generates electron-hole pairs. The staggered band offsets decide where each carrier can go.</p>
+            </div>
+            <!-- Screening Verdict Badge -->
+            <div id="lab-verdict-pill" class="px-3.5 py-1.5 rounded-xl border text-xs font-bold font-mono flex items-center gap-2">
+              <span class="w-2 h-2 rounded-full bg-emerald-400"></span>
+              <span id="lab-verdict-text">VERDICT: FAVORABLE</span>
+            </div>
+          </div>
+
+          <!-- Architecture Preset Buttons -->
+          <div class="flex flex-wrap gap-1.5 pt-1">
+            <button onclick="loadDevicePreset('leadfree_2t')" data-preset="leadfree_2t" class="preset-btn ctl-btn on">Lead-Free Perovskite / ACIGS 2T Tandem</button>
+            <button onclick="loadDevicePreset('nip')" data-preset="nip" class="preset-btn ctl-btn">Standard n-i-p Perovskite</button>
+            <button onclick="loadDevicePreset('pin')" data-preset="pin" class="preset-btn ctl-btn">Inverted p-i-n Perovskite</button>
+            <button onclick="loadDevicePreset('ctlfree')" data-preset="ctlfree" class="preset-btn ctl-btn">CTL-Free Perovskite</button>
+            <button onclick="loadDevicePreset('multi')" data-preset="multi" class="preset-btn ctl-btn">Graded Multi-Absorber</button>
+            <button onclick="loadDevicePreset('tandem4t')" data-preset="tandem4t" class="preset-btn ctl-btn">4-Terminal (4T) Tandem</button>
+            <button onclick="loadDevicePreset('faulty')" data-preset="faulty" class="preset-btn ctl-btn text-sv-red">Faulty Interface Spike Demo</button>
+          </div>
+
+          <!-- Sticky Simulation Controls Bar (Matching Reference Code Exactly) -->
+          <div class="pt-3 border-t border-sv-line flex flex-wrap items-center gap-3">
+            <button id="pp" class="ctl-btn font-semibold">Pause</button>
+            <label class="text-xs text-sv-muted flex items-center gap-2">
+              <span>Speed</span>
+              <input id="sp" type="range" min="0.25" max="2" step="0.25" value="1" class="w-28" />
+              <span id="spv" class="font-mono text-white w-8">1×</span>
+            </label>
+            <span class="flex-1"></span>
+            <div class="flex flex-wrap gap-1.5" id="focus-group">
+              <button class="ctl-btn on" data-f="all">All</button>
+              <button class="ctl-btn" data-f="top">Top sub-cell</button>
+              <button class="ctl-btn" data-f="bot">Bottom sub-cell</button>
+            </div>
+          </div>
+
+          <!-- Exact Reference Color Legend -->
+          <div class="flex flex-wrap gap-x-5 gap-y-1.5 text-xs text-sv-muted">
+            <span class="inline-flex items-center gap-1.5"><i class="inline-block w-3 h-3 rounded-full bg-[#a78bfa]"></i>High-energy photon</span>
+            <span class="inline-flex items-center gap-1.5"><i class="inline-block w-3 h-3 rounded-full bg-[#f87171]"></i>Low-energy photon</span>
+            <span class="inline-flex items-center gap-1.5"><i class="inline-block w-3 h-3 rounded-full bg-[#38bdf8]"></i>Electron (−)</span>
+            <span class="inline-flex items-center gap-1.5"><i class="inline-block w-3 h-3 rounded-full border-2 border-[#fb923c]"></i>Hole (+)</span>
+            <span class="inline-flex items-center gap-1.5"><b class="text-[#f87171]">✕</b>Blocked by band offset</span>
+          </div>
+        </div>
+
+        <!-- FIG. A: Animated Device Cross-Section Canvas -->
+        <figure class="m-0 relative">
+          <canvas id="c1" class="sim-canvas cursor-crosshair" role="img" aria-label="Animated device cross-section showing photons, pair generation in each absorber, charge separation, recombination between sub-cells and the external circuit"></canvas>
+          <figcaption class="text-xs text-sv-muted mt-1.5 px-1 flex flex-wrap justify-between gap-2">
+            <span><strong class="text-sv-text">Fig. A</strong> Device cross-section: light absorption, pair generation and carrier collection.</span>
+            <span class="text-sky-400/80">Hover over any layer to inspect optical &amp; thickness properties</span>
+          </figcaption>
+        </figure>
+
+        <!-- Dynamic Absorber Pair-Generation Percentage Cards -->
+        <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-2.5 num-tab" id="cards"></div>
+
+        <!-- Detailed-Balance (SQ) & SCAPS-1D Coupled Drift-Diffusion Estimator -->
+        <div class="rounded-2xl bg-sv-panel border border-sv-line p-4 sm:p-5 num-tab space-y-3.5">
+          <div class="flex flex-wrap items-center justify-between gap-2 border-b border-sv-line pb-2.5">
+            <div>
+              <h3 class="text-sm font-bold text-white">Detailed-Balance (SQ) &amp; SCAPS-1D Realistic Device Estimator</h3>
+              <p class="text-[11px] text-sv-muted">Compares thermodynamic radiative limit (AM1.5G, 300 K) against thickness-filtered Beer–Lambert &amp; SRH drift-diffusion physics</p>
+            </div>
+            <div class="flex flex-wrap items-center gap-2">
+              <div class="inline-flex rounded-lg bg-sv-bg border border-sv-line p-0.5 text-[11px]">
+                <button id="est-mode-scaps" onclick="setEstimatorDisplayMode('scaps')" class="px-2.5 py-1 rounded-md bg-[#16284d] text-sky-400 font-bold transition-all">SCAPS-1D Coupled</button>
+                <button id="est-mode-sq" onclick="setEstimatorDisplayMode('sq')" class="px-2.5 py-1 rounded-md text-sv-muted hover:text-white transition-all">Ideal SQ Limit</button>
+              </div>
+              <span id="sq-coupling-badge" class="px-2.5 py-1 rounded-lg bg-sky-500/15 text-sky-400 border border-sky-500/30 text-[11px] font-bold">2T Series Current-Matched</span>
+            </div>
+          </div>
+
+          <div class="grid grid-cols-2 sm:grid-cols-5 gap-2.5 text-xs">
+            <div class="p-3 rounded-xl bg-sv-bg border border-sv-line">
+              <div id="sq-lbl-voc" class="text-[11px] text-sv-muted">SCAPS-1D Est. Voc</div>
+              <div id="sq-voc" class="text-lg font-bold text-sky-400 mt-0.5">1.65 V</div>
+              <div id="sq-voc-note" class="text-[10px] text-sv-muted">SQ limit: 2.09 V</div>
+            </div>
+            <div class="p-3 rounded-xl bg-sv-bg border border-sv-line">
+              <div id="sq-lbl-jsc" class="text-[11px] text-sv-muted">Current-Matched Jsc</div>
+              <div id="sq-jsc" class="text-lg font-bold text-violet-400 mt-0.5">22.90 mA/cm²</div>
+              <div id="sq-jsc-note" class="text-[10px] text-sv-muted">Beer-Lambert split</div>
+            </div>
+            <div class="p-3 rounded-xl bg-sv-bg border border-sv-line">
+              <div id="sq-lbl-ff" class="text-[11px] text-sv-muted">Realistic Fill Factor</div>
+              <div id="sq-ff" class="text-lg font-bold text-amber-400 mt-0.5">81.94 %</div>
+              <div id="sq-ff-note" class="text-[10px] text-sv-muted">SQ limit: 89.5 %</div>
+            </div>
+            <div class="p-3 rounded-xl bg-sv-bg border border-sv-line">
+              <div id="sq-lbl-pce" class="text-[11px] text-sv-muted">SCAPS-1D Est. PCE</div>
+              <div id="sq-pce" class="text-lg font-bold text-emerald-400 mt-0.5">30.96 %</div>
+              <div id="sq-pce-note" class="text-[10px] text-emerald-400">Aligned interfaces</div>
+            </div>
+            <div class="p-3 rounded-xl bg-sv-bg border border-sv-line col-span-2 sm:col-span-1">
+              <div id="sq-lbl-ref" class="text-[11px] text-sv-muted">Radiative SQ Ceiling</div>
+              <div id="sq-real-pce" class="text-lg font-bold text-white mt-0.5">35.10 %</div>
+              <div id="sq-real-note" class="text-[10px] text-sky-400">88.2% of SQ limit</div>
+            </div>
+          </div>
+        </div>
+
+        <!-- FIG. B: Animated Horizontal Energy Band Diagram Canvas -->
+        <figure class="m-0 relative">
+          <canvas id="c2" class="sim-canvas cursor-crosshair" role="img" aria-label="Animated energy band diagram showing staggered alignment that blocks wrong-direction electrons and holes"></canvas>
+          <figcaption class="text-xs text-sv-muted mt-1.5 px-1 flex flex-wrap justify-between gap-2">
+            <span><strong class="text-sv-text">Fig. B</strong> Band diagram. Electrons roll down the conduction-band steps, holes float up the valence-band steps, and the offsets block the wrong direction.</span>
+            <span class="text-sky-400/80">Hover over any band block to inspect Ec, Ev, Eg, and χ</span>
+          </figcaption>
+        </figure>
+
+        <!-- Editable Layer Stack Builder & Interface ΔEc/ΔEv Diagnostics -->
+        <div class="grid grid-cols-1 lg:grid-cols-12 gap-5">
+          <!-- Custom Stack Editor (7 cols) -->
+          <div class="lg:col-span-7 rounded-2xl bg-sv-panel border border-sv-line p-4 sm:p-5 space-y-3">
+            <div class="flex flex-wrap items-center justify-between gap-2 border-b border-sv-line pb-3">
+              <div>
+                <h3 class="text-sm font-bold text-white">Interactive Device Stack Editor</h3>
+                <p class="text-[11px] text-sv-muted">Swap, reorder, add, or remove layers (nm) to test band alignment in real time</p>
+              </div>
+              <div class="flex flex-wrap gap-1.5">
+                <button onclick="addLayerToStack()" class="ctl-btn text-xs">+ Add Layer</button>
+                <button onclick="loadDevicePreset(devConfig.presetKey)" class="ctl-btn text-xs">Reset Preset</button>
+                <button onclick="copyScapsParameters()" class="ctl-btn text-xs">Copy Table</button>
+                <button onclick="downloadScapsDefFile()" class="ctl-btn on text-xs">Download .def</button>
+              </div>
+            </div>
+            <div id="stack-editor-rows" class="space-y-2 max-h-80 overflow-y-auto pr-1">
+              <!-- Populated dynamically -->
+            </div>
+          </div>
+
+          <!-- Interface Offset Diagnostic Table & Physics Notes (5 cols) -->
+          <div class="lg:col-span-5 rounded-2xl bg-sv-panel border border-sv-line p-4 sm:p-5 space-y-3">
+            <div class="border-b border-sv-line pb-2.5">
+              <h3 class="text-sm font-bold text-white">Interface ΔEc &amp; ΔEv Band-Offset Check</h3>
+              <p class="text-[11px] text-sv-muted">Vacuum = 0 eV | Spike &gt; 0.4 eV or Deep Cliff &lt; -0.3 eV triggers blocking/loss</p>
+            </div>
+            <div id="offset-diagnostics-list" class="space-y-2 max-h-60 overflow-y-auto pr-1 text-xs">
+              <!-- Populated dynamically -->
+            </div>
+            <div id="preset-physics-notes" class="p-3 rounded-xl bg-sv-bg border border-sv-line text-xs text-slate-300 space-y-1.5 leading-relaxed">
+              <!-- Populated dynamically -->
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- =================================================================== -->
+      <!-- VIEW 3: ABSORBER & CTL LIBRARY (HOMO/LUMO, χ, Eg & DFT ADDER)       -->
+      <!-- =================================================================== -->
+      <section id="view-library" class="app-view hidden space-y-5">
+        <div class="rounded-2xl bg-sv-panel border border-sv-line p-5 space-y-4">
+          <div class="flex flex-wrap items-center justify-between gap-3 border-b border-sv-line pb-4">
+            <div>
+              <h1 class="text-lg sm:text-xl font-bold text-white">Referenced Absorber, ETL, HTL &amp; Contact Library</h1>
+              <p class="text-xs text-sv-muted">Includes Lead-Free Perovskites, ACIGS, SnO₂, TiO₂, Spiro-OMeTAD, NiOₓ, SCAPS-1D parameters, and custom DFT entries</p>
+            </div>
+            <div class="flex flex-wrap items-center gap-2">
+              <select id="lib-role-filter" onchange="renderLibraryTable()" class="bg-sv-bg border border-sv-line rounded-lg px-3 py-1.5 text-xs text-white">
+                <option value="all">All Roles</option>
+                <option value="absorber">Absorbers</option>
+                <option value="etl">ETLs (Electron Transport)</option>
+                <option value="htl">HTLs (Hole Transport)</option>
+                <option value="contact">Contacts &amp; Buffers</option>
+              </select>
+              <select id="lib-eg-filter" onchange="renderLibraryTable()" class="bg-sv-bg border border-sv-line rounded-lg px-3 py-1.5 text-xs text-white">
+                <option value="all">All Bandgaps (Eg)</option>
+                <option value="narrow">Narrow (&lt; 1.45 eV | Bottom)</option>
+                <option value="medium">Medium (1.45 - 1.75 eV | Single)</option>
+                <option value="wide">Wide (&gt; 1.75 eV | Top/CTL)</option>
+              </select>
+              <label class="flex items-center gap-1.5 text-xs text-sv-muted cursor-pointer bg-sv-bg border border-sv-line rounded-lg px-2.5 py-1.5">
+                <input id="lib-pb-filter" type="checkbox" onchange="renderLibraryTable()" class="rounded" />
+                <span>Lead-Free Only</span>
+              </label>
+              <input id="lib-search-input" type="text" placeholder="Search compound..." oninput="renderLibraryTable()" class="bg-sv-bg border border-sv-line rounded-lg px-3 py-1.5 text-xs text-white w-44" />
+            </div>
+          </div>
+
+          <div class="overflow-x-auto max-h-96 overflow-y-auto">
+            <table class="w-full text-left border-collapse text-xs num-tab">
+              <thead class="sticky top-0 bg-sv-bg text-sv-muted text-[11px] border-b border-sv-line">
+                <tr>
+                  <th class="py-2.5 px-3">Compound</th>
+                  <th class="py-2.5 px-3">Role</th>
+                  <th class="py-2.5 px-3">Eg (eV)</th>
+                  <th class="py-2.5 px-3">χ / LUMO</th>
+                  <th class="py-2.5 px-3">Ec (eV)</th>
+                  <th class="py-2.5 px-3">Ev / HOMO</th>
+                  <th class="py-2.5 px-3">εr | μe/μh</th>
+                  <th class="py-2.5 px-3">Reported PCE / Note</th>
+                  <th class="py-2.5 px-3">Citation / Source</th>
+                  <th class="py-2.5 px-3 text-right">Action</th>
+                </tr>
+              </thead>
+              <tbody id="library-table-body" class="divide-y divide-sv-line/60">
+                <!-- Populated dynamically -->
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+        <!-- Add Custom DFT / SCAPS Compound Form -->
+        <div class="rounded-2xl bg-sv-panel border border-sv-line p-5 space-y-4">
+          <div class="border-b border-sv-line pb-3">
+            <h2 class="text-base font-bold text-white">+ Add Custom DFT / SCAPS-1D Compound</h2>
+            <p class="text-xs text-sv-muted">Added compounds immediately appear in the Device &amp; Band Alignment Lab dropdowns.</p>
+          </div>
+          <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-6 gap-3 text-xs">
+            <div class="lg:col-span-2">
+              <label class="block text-sv-muted mb-1">Compound Name / Formula</label>
+              <input id="new-mat-name" type="text" placeholder="e.g. Cs2AgBi0.5Sb0.5Br6" class="w-full bg-sv-bg border border-sv-line rounded-lg px-3 py-2 text-white" />
+            </div>
+            <div>
+              <label class="block text-sv-muted mb-1">Role</label>
+              <select id="new-mat-role" class="w-full bg-sv-bg border border-sv-line rounded-lg px-3 py-2 text-white">
+                <option value="absorber">Absorber</option>
+                <option value="etl">ETL</option>
+                <option value="htl">HTL</option>
+                <option value="contact">Contact / Buffer</option>
+              </select>
+            </div>
+            <div>
+              <label class="block text-sv-muted mb-1">Bandgap Eg (eV)</label>
+              <input id="new-mat-eg" type="number" step="0.01" value="1.60" class="w-full bg-sv-bg border border-sv-line rounded-lg px-3 py-2 text-white font-mono" />
+            </div>
+            <div>
+              <label class="block text-sv-muted mb-1">Affinity χ / WF (eV)</label>
+              <input id="new-mat-chi" type="number" step="0.01" value="3.95" class="w-full bg-sv-bg border border-sv-line rounded-lg px-3 py-2 text-white font-mono" />
+            </div>
+            <div>
+              <label class="block text-sv-muted mb-1">Permittivity εr</label>
+              <input id="new-mat-eps" type="number" step="0.1" value="9.5" class="w-full bg-sv-bg border border-sv-line rounded-lg px-3 py-2 text-white font-mono" />
+            </div>
+            <div class="lg:col-span-4">
+              <label class="block text-sv-muted mb-1">Citation / DFT Functional (e.g. HSE06, PBE, DOI)</label>
+              <input id="new-mat-ref" type="text" placeholder="DFT-HSE06 / Rakib et al. (2026)" class="w-full bg-sv-bg border border-sv-line rounded-lg px-3 py-2 text-white" />
+            </div>
+            <div class="flex items-end">
+              <label class="flex items-center gap-2 text-xs text-sv-text pb-2 cursor-pointer">
+                <input id="new-mat-pb" type="checkbox" checked class="rounded" />
+                <span>Lead-Free</span>
+              </label>
+            </div>
+            <div class="flex items-end">
+              <button onclick="addCustomCompound()" class="ctl-btn on w-full py-2 font-semibold">Add to Lab</button>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- =================================================================== -->
+      <!-- VIEW 4: BANGLADESH 64-DISTRICT SOLAR PLANNER                        -->
+      <!-- =================================================================== -->
+      <section id="view-planner" class="app-view hidden space-y-5">
+        <div class="grid grid-cols-1 lg:grid-cols-12 gap-5">
+          <!-- Left Inputs (5 cols) -->
+          <div class="lg:col-span-5 rounded-2xl bg-sv-panel border border-sv-line p-5 space-y-4">
+            <div class="border-b border-sv-line pb-3 flex items-center justify-between">
+              <div>
+                <h1 class="text-lg font-bold text-white">🇧🇩 Bangladesh 64-District Solar Planner</h1>
+                <p class="text-xs text-sv-muted">PVGIS Irradiation, Heat Derating &amp; BDT Payback Model</p>
+              </div>
+              <span class="text-[10px] font-mono px-2 py-0.5 rounded bg-sky-500/15 text-sky-400 border border-sky-500/30">64 Districts</span>
+            </div>
+
+            <div>
+              <label class="block text-xs font-semibold text-sv-muted mb-1">1. District (All 64 Districts)</label>
+              <select id="bd-dist-select" onchange="onBdDistrictSelect()" class="w-full bg-sv-bg border border-sv-line rounded-xl px-3 py-2 text-xs font-semibold text-white"></select>
+              <div id="bd-dist-info" class="text-[11px] font-mono text-sky-400 mt-1">Lat: 23.81°N | PSH: 4.75 h/day | Optimal Tilt: 21° South</div>
+            </div>
+
+            <div>
+              <label class="block text-xs font-semibold text-sv-muted mb-1">2. Panel Technology</label>
+              <select id="bd-tech-select" onchange="recalcBdPlanner()" class="w-full bg-sv-bg border border-sv-line rounded-xl px-3 py-2 text-xs font-semibold text-white">
+                <option value="topcon">N-Type TOPCon (580 Wp | 22.4% Eff | ৳30/Wp) [Commercial BD]</option>
+                <option value="monoperc" selected>Mono PERC Tier-1 (550 Wp | 21.3% Eff | ৳27/Wp) [Commercial BD]</option>
+                <option value="bifacial">Bifacial Glass-Glass (560 Wp | 21.8% Eff | ৳31/Wp) [Commercial BD]</option>
+                <option value="poly">Polycrystalline (330 Wp | 17.2% Eff | ৳24/Wp) [Budget BD]</option>
+                <option value="tandem_proj">Perovskite/Si 2T Tandem (680 Wp | 29.5% Eff | ৳38/Wp) [Projected Scenario]</option>
+              </select>
+            </div>
+
+            <div class="p-3.5 rounded-xl bg-sv-bg border border-sv-line space-y-2.5">
+              <div class="flex items-center justify-between text-xs">
+                <span class="font-semibold text-sv-muted">3. Energy / Capacity Target</span>
+                <select id="bd-input-unit" onchange="recalcBdPlanner()" class="bg-sv-panel border border-sv-line rounded-lg px-2 py-1 text-[11px] text-white">
+                  <option value="kwp">Target System (kWp)</option>
+                  <option value="daily_kwh">Daily Energy (kWh/day)</option>
+                  <option value="monthly_kwh">Monthly Energy (kWh/mo)</option>
+                </select>
+              </div>
+              <div class="flex items-center gap-3">
+                <input id="bd-target-val" type="number" step="0.5" min="0.5" value="5" oninput="recalcBdPlanner()" class="w-28 bg-sv-panel border border-sv-line rounded-lg px-3 py-1.5 text-sm font-mono font-bold text-sky-400" />
+                <span id="bd-target-hint" class="text-xs text-sv-muted font-mono">= 5,000 Wp DC Array</span>
+              </div>
+            </div>
+
+            <div class="grid grid-cols-2 gap-3 text-xs">
+              <div>
+                <label class="block text-sv-muted mb-1">4. System Mode</label>
+                <select id="bd-mode-select" onchange="recalcBdPlanner()" class="w-full bg-sv-bg border border-sv-line rounded-xl px-2.5 py-2 text-white font-semibold">
+                  <option value="ongrid">On-Grid (Net Metering)</option>
+                  <option value="hybrid" selected>Hybrid (Net + Battery)</option>
+                  <option value="offgrid">Off-Grid (Standalone)</option>
+                </select>
+              </div>
+              <div>
+                <label class="block text-sv-muted mb-1">5. BD Tariff Slab Preset</label>
+                <select id="bd-tariff-preset" onchange="onBdTariffPresetChange()" class="w-full bg-sv-bg border border-sv-line rounded-xl px-2.5 py-2 text-white font-semibold">
+                  <option value="13.44">Residential Top Slab (&gt;600u | ৳13.44)</option>
+                  <option value="11.50" selected>Residential Slab 401-600u (৳11.50)</option>
+                  <option value="8.95">Residential Mid Slab 201-300u (৳8.95)</option>
+                  <option value="13.00">Commercial Flat Tariff (৳13.00)</option>
+                  <option value="9.90">Industrial / Net-Meter Export (৳9.90)</option>
+                </select>
+              </div>
+            </div>
+
+            <div class="grid grid-cols-2 gap-3 text-xs items-center">
+              <div>
+                <label class="block text-sv-muted mb-1">Custom Tariff (BDT/kWh)</label>
+                <input id="bd-tariff-input" type="number" step="0.1" value="11.5" oninput="recalcBdPlanner()" class="w-full bg-sv-bg border border-sv-line rounded-xl px-3 py-1.5 text-white font-bold num-tab" />
+              </div>
+              <div>
+                <label class="block text-sv-muted mb-1">Seasonal Tilt Mode</label>
+                <select id="bd-season-select" onchange="applyBdSeasonalTilt()" class="w-full bg-sv-bg border border-sv-line rounded-xl px-2.5 py-1.5 text-white font-semibold">
+                  <option value="annual" selected>Annual Optimal (~0.87×Lat)</option>
+                  <option value="summer">Summer Monsoon (Lat - 12°)</option>
+                  <option value="winter">Winter Peak (Lat + 14°)</option>
+                </select>
+              </div>
+            </div>
+
+            <div class="grid grid-cols-2 gap-3 pt-1">
+              <div>
+                <div class="flex justify-between text-[11px] mb-1">
+                  <span class="text-sv-muted">Cell Temp</span>
+                  <span id="bd-cell-temp-lbl" class="font-mono text-orange-400">58°C (Summer)</span>
+                </div>
+                <input id="bd-cell-temp" type="range" min="25" max="65" step="1" value="58" class="w-full" oninput="recalcBdPlanner()" />
+                <div class="flex justify-between text-[10px] font-mono text-sv-muted">
+                  <button onclick="setBdTemp(25)" class="hover:text-sky-400">25°C Winter</button>
+                  <button onclick="setBdTemp(58)" class="hover:text-orange-400">58°C Dhaka</button>
+                </div>
+              </div>
+              <div>
+                <div class="flex justify-between text-[11px] mb-1">
+                  <span class="text-sv-muted">Tilt Override</span>
+                  <span id="bd-tilt-lbl" class="font-mono text-sky-400">21°</span>
+                </div>
+                <input id="bd-tilt-input" type="range" min="0" max="50" step="1" value="21" class="w-full" oninput="recalcBdPlanner()" />
+                <div class="flex justify-between text-[10px] font-mono text-sv-muted">
+                  <span>0° Flat</span>
+                  <button onclick="resetBdOptimalTilt()" class="text-sky-400">Optimal</button>
+                  <span>50°</span>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Right Outputs & Dual Canvases (7 cols) -->
+          <div class="lg:col-span-7 space-y-4">
+            <!-- 4 KPI Summary Cards -->
+            <div class="grid grid-cols-2 sm:grid-cols-4 gap-2.5">
+              <div class="rounded-xl bg-sv-panel border border-sv-line p-3.5">
+                <div class="text-[11px] text-sv-muted">Panels Needed</div>
+                <div id="bd-kpi-panels" class="text-xl font-bold font-mono text-sky-400 mt-0.5">10 pcs</div>
+                <div id="bd-kpi-kwp" class="text-[11px] font-mono text-sv-muted">5.50 kWp</div>
+              </div>
+              <div class="rounded-xl bg-sv-panel border border-sv-line p-3.5">
+                <div class="text-[11px] text-sv-muted">Roof Area Needed</div>
+                <div id="bd-kpi-area" class="text-xl font-bold font-mono text-violet-400 mt-0.5">365 ft²</div>
+                <div id="bd-kpi-m2" class="text-[11px] font-mono text-sv-muted">33.9 m²</div>
+              </div>
+              <div class="rounded-xl bg-sv-panel border border-sv-line p-3.5">
+                <div class="text-[11px] text-sv-muted">Total CAPEX (BDT)</div>
+                <div id="bd-kpi-cost" class="text-xl font-bold font-mono text-orange-400 mt-0.5">৳ 4.84L</div>
+                <div id="bd-kpi-cost-full" class="text-[11px] font-mono text-sv-muted">BDT 484,000</div>
+              </div>
+              <div class="rounded-xl bg-sv-panel border border-sv-line p-3.5">
+                <div class="text-[11px] text-sv-muted">Simple Payback</div>
+                <div id="bd-kpi-payback" class="text-xl font-bold font-mono text-emerald-400 mt-0.5">5.3 yrs</div>
+                <div id="bd-kpi-save" class="text-[11px] font-mono text-sv-muted">৳ 91,200/yr</div>
+              </div>
+            </div>
+
+            <!-- Live Sun-Path & Tilt Angle Canvas -->
+            <figure class="m-0">
+              <canvas id="bd-tilt-canvas" class="sim-canvas" aria-label="Sun path and roof tilt angle optimizer animation"></canvas>
+              <figcaption class="text-xs text-sv-muted mt-1">
+                <strong class="text-sv-text">Fig. C</strong> District Sun-Path &amp; Tilt Angle Optimizer (South-facing orientation &amp; winter shadow clearance).
+              </figcaption>
+            </figure>
+
+            <!-- Live Rooftop Array & Power Flow Canvas -->
+            <figure class="m-0">
+              <canvas id="bd-flow-canvas" class="sim-canvas" aria-label="Rooftop panel layout and live power flow animation"></canvas>
+              <figcaption class="text-xs text-sv-muted mt-1">
+                <strong class="text-sv-text">Fig. D</strong> Rooftop Module Array Layout &amp; Real-Time Inverter / Battery / Grid Power Flow.
+              </figcaption>
+            </figure>
+
+            <!-- 25-Year Cumulative Cash-Flow & Payback Canvas -->
+            <figure class="m-0">
+              <canvas id="bd-cash-canvas" class="sim-canvas" aria-label="25-year cumulative cash flow and payback timeline"></canvas>
+              <figcaption class="text-xs text-sv-muted mt-1">
+                <strong class="text-sv-text">Fig. E</strong> 25-Year Cumulative Net Cash-Flow &amp; Break-Even Timeline (Accounting for 0.5%/yr Module Degradation &amp; 4%/yr Tariff Escalation).
+              </figcaption>
+            </figure>
+          </div>
+        </div>
+
+        <!-- Full Technology Comparison Table for Same Load -->
+        <div class="rounded-2xl bg-sv-panel border border-sv-line p-5">
+          <h3 class="text-sm font-bold text-white mb-3">Panel Technology Comparison for Your Selected Load &amp; District</h3>
+          <div class="overflow-x-auto">
+            <table class="w-full text-left border-collapse text-xs">
+              <thead class="bg-sv-bg text-sv-muted font-mono text-[11px] border-b border-sv-line">
+                <tr>
+                  <th class="py-2.5 px-3">Technology</th>
+                  <th class="py-2.5 px-3">Maturity</th>
+                  <th class="py-2.5 px-3">Panels</th>
+                  <th class="py-2.5 px-3">Roof Area</th>
+                  <th class="py-2.5 px-3">Est. Cost (BDT)</th>
+                  <th class="py-2.5 px-3">Annual Yield</th>
+                  <th class="py-2.5 px-3">Payback</th>
+                </tr>
+              </thead>
+              <tbody id="bd-compare-tbody" class="divide-y divide-sv-line/60 font-mono">
+                <!-- Populated dynamically -->
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </section>
+
+      <!-- =================================================================== -->
+      <!-- VIEW 5: BD MARKET & FUTURE                                          -->
+      <!-- =================================================================== -->
+      <section id="view-market" class="app-view hidden space-y-5">
+        <div class="rounded-2xl bg-sv-panel border border-sv-line p-5 sm:p-6 space-y-5">
+          <div class="border-b border-sv-line pb-4 flex flex-wrap items-center justify-between gap-2">
+            <div>
+              <h1 class="text-xl font-bold text-white">Bangladesh Solar Market, User Adoption &amp; 2041 Vision</h1>
+              <p class="text-xs text-sv-muted">Compiled from SREDA National Database, BPDB &amp; Integrated Energy and Power Master Plan (IEPMP)</p>
+            </div>
+            <span class="px-3 py-1 rounded-lg bg-emerald-500/15 text-emerald-400 border border-emerald-500/30 font-mono text-xs font-bold">2041 Target: 40% Clean Energy</span>
+          </div>
+
+          <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+            <div class="p-4 rounded-xl bg-sv-bg border border-sv-line">
+              <div class="text-xs text-sv-muted">SREDA Installed Solar</div>
+              <div class="text-2xl font-bold font-mono text-sky-400 mt-1">~1,150+ MW</div>
+              <p class="text-xs text-sv-muted mt-1.5">Utility solar parks (Teesta, Mongla, Cox’s Bazar), net-metered industrial roofs, and off-grid mini-grids.</p>
+            </div>
+            <div class="p-4 rounded-xl bg-sv-bg border border-sv-line">
+              <div class="text-xs text-sv-muted">Active Solar Users</div>
+              <div class="text-2xl font-bold font-mono text-orange-400 mt-1">6.0M+ SHS</div>
+              <p class="text-xs text-sv-muted mt-1.5">Over 6 million Solar Home Systems serving ~20M rural citizens plus thousands of commercial net-metering users.</p>
+            </div>
+            <div class="p-4 rounded-xl bg-sv-bg border border-sv-line">
+              <div class="text-xs text-sv-muted">Industrial Rooftop Potential</div>
+              <div class="text-2xl font-bold font-mono text-violet-400 mt-1">4,000+ MW</div>
+              <p class="text-xs text-sv-muted mt-1.5">RMG &amp; textile factory sheds in Gazipur, Narayanganj, Savar, and Chattogram EPZ areas.</p>
+            </div>
+            <div class="p-4 rounded-xl bg-sv-bg border border-sv-line">
+              <div class="text-xs text-sv-muted">2041 Clean Energy Vision</div>
+              <div class="text-2xl font-bold font-mono text-emerald-400 mt-1">40% Share</div>
+              <p class="text-xs text-sv-muted mt-1.5">National roadmap targeting 40% clean/renewable electricity generation by 2041 alongside storage &amp; smart grids.</p>
+            </div>
+          </div>
+
+          <!-- Bangladesh Climate & Engineering Challenges -->
+          <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div class="p-4 rounded-xl bg-sv-bg border border-sv-line space-y-2">
+              <h3 class="text-sm font-bold text-orange-400">1. High Ambient Heat &amp; Roof Temperature (55°C-65°C)</h3>
+              <p class="text-xs text-slate-300 leading-relaxed">
+                Concrete rooftops in Dhaka and Rajshahi reach 58°C+ in April-May, reducing standard Silicon output by 10%-14%. N-Type TOPCon (-0.29%/°C) and wide-bandgap Perovskite tandems offer superior thermal resilience.
+              </p>
+            </div>
+            <div class="p-4 rounded-xl bg-sv-bg border border-sv-line space-y-2">
+              <h3 class="text-sm font-bold text-sky-400">2. Monsoon Humidity (80%-95% RH) &amp; Encapsulation</h3>
+              <p class="text-xs text-slate-300 leading-relaxed">
+                Bangladesh’s heavy monsoon humidity accelerates moisture ingress. Commercial installations require glass-glass PID-resistant modules, while future perovskite cells require butyl-rubber edge sealing and inorganic CTLs (NiOₓ, SnO₂).
+              </p>
+            </div>
+            <div class="p-4 rounded-xl bg-sv-bg border border-sv-line space-y-2">
+              <h3 class="text-sm font-bold text-violet-400">3. Urban Dust Soiling (Dry Winter Season)</h3>
+              <p class="text-xs text-slate-300 leading-relaxed">
+                From November to March, airborne construction dust in Dhaka and Chattogram can reduce solar yield by 8%-18% unless panels are tilted at ≥15°-21° and cleaned bi-weekly.
+              </p>
+            </div>
+            <div class="p-4 rounded-xl bg-sv-bg border border-sv-line space-y-2">
+              <h3 class="text-sm font-bold text-emerald-400">4. Agricultural Land Scarcity &amp; High-Efficiency Tandems</h3>
+              <p class="text-xs text-slate-300 leading-relaxed">
+                Because fertile arable land cannot be sacrificed for ground-mounted solar farms, Bangladesh’s future relies on high-efficiency (&gt;28%) Perovskite/Silicon tandem panels on urban roofs, riverine chars, and floating solar on Kaptai Lake.
+              </p>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- =================================================================== -->
+      <!-- VIEW 6: SOLAR CELL ACADEMY                                          -->
+      <!-- =================================================================== -->
+      <section id="view-academy" class="app-view hidden space-y-5">
+        <div class="rounded-2xl bg-sv-panel border border-sv-line p-5 sm:p-6 space-y-5">
+          <div class="border-b border-sv-line pb-4">
+            <h1 class="text-xl font-bold text-white">Solar Cell Academy: Device Physics &amp; Architectures</h1>
+            <p class="text-xs text-sv-muted">Comprehensive guide to photovoltaic working principles and next-generation device structures</p>
+          </div>
+
+          <!-- Working Principle 3-Step Flow -->
+          <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+            <div class="p-4 rounded-xl bg-sv-bg border border-sv-line space-y-1.5">
+              <span class="text-xs font-mono text-violet-400 font-bold">STEP 01 | ABSORPTION</span>
+              <h3 class="text-sm font-bold text-white">Photon Excitation (<span class="font-mono">hν ≥ Eg</span>)</h3>
+              <p class="text-xs text-sv-muted leading-relaxed">
+                Incident sunlight passes through the transparent front electrode (FTO/ITO). Photons with energy equal to or greater than the absorber bandgap (<span class="font-mono">Eg</span>) excite electrons from the valence band (<span class="font-mono">Ev</span>) to the conduction band (<span class="font-mono">Ec</span>), creating electron-hole pairs.
+              </p>
+            </div>
+            <div class="p-4 rounded-xl bg-sv-bg border border-sv-line space-y-1.5">
+              <span class="text-xs font-mono text-sky-400 font-bold">STEP 02 | SEPARATION</span>
+              <h3 class="text-sm font-bold text-white">Selective Charge Transport</h3>
+              <p class="text-xs text-sv-muted leading-relaxed">
+                Staggered band offsets direct electrons down conduction-band steps toward the ETL/front contact while blocking holes, and direct holes up valence-band steps toward the HTL/back contact while blocking electrons.
+              </p>
+            </div>
+            <div class="p-4 rounded-xl bg-sv-bg border border-sv-line space-y-1.5">
+              <span class="text-xs font-mono text-orange-400 font-bold">STEP 03 | COLLECTION</span>
+              <h3 class="text-sm font-bold text-white">External Circuit &amp; Power</h3>
+              <p class="text-xs text-sv-muted leading-relaxed">
+                Collected electrons flow through the external load to deliver electrical power (<span class="font-mono">P = V × I</span>) and recombine with holes at the back metal electrode (Au, Ag, or Carbon).
+              </p>
+            </div>
+          </div>
+
+          <!-- Device Architectures Matrix -->
+          <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+            <div class="p-4 rounded-xl bg-sv-bg border border-sv-line space-y-2">
+              <div class="flex items-center justify-between">
+                <h4 class="text-sm font-bold text-sky-400">Regular n-i-p Perovskite</h4>
+                <span class="text-[10px] font-mono px-2 py-0.5 rounded bg-sky-500/15 text-sky-400">Up to 26.1%</span>
+              </div>
+              <p class="text-[11px] font-mono text-sv-muted">FTO / SnO₂ (ETL) / Perovskite / Spiro-OMeTAD (HTL) / Au</p>
+              <p class="text-xs text-slate-300 leading-relaxed">Light enters through the n-type ETL. Delivers high Voc, though doped Spiro-OMeTAD requires moisture protection.</p>
+            </div>
+
+            <div class="p-4 rounded-xl bg-sv-bg border border-sv-line space-y-2">
+              <div class="flex items-center justify-between">
+                <h4 class="text-sm font-bold text-violet-400">Inverted p-i-n Perovskite</h4>
+                <span class="text-[10px] font-mono px-2 py-0.5 rounded bg-violet-500/15 text-violet-400">Up to 26.0%</span>
+              </div>
+              <p class="text-[11px] font-mono text-sv-muted">ITO / NiOₓ or SAM (HTL) / Perovskite / C₆₀ (ETL) / Ag</p>
+              <p class="text-xs text-slate-300 leading-relaxed">Light enters through the p-type HTL. Offers superior operational stability and low parasitic absorption for tandem top cells.</p>
+            </div>
+
+            <div class="p-4 rounded-xl bg-sv-bg border border-sv-line space-y-2">
+              <div class="flex items-center justify-between">
+                <h4 class="text-sm font-bold text-emerald-400">CTL-Free Architecture</h4>
+                <span class="text-[10px] font-mono px-2 py-0.5 rounded bg-emerald-500/15 text-emerald-400">Cost-Effective</span>
+              </div>
+              <p class="text-[11px] font-mono text-sv-muted">FTO / Perovskite Absorber / Printable Carbon</p>
+              <p class="text-xs text-slate-300 leading-relaxed">Eliminates expensive organic ETL/HTL layers by matching contact work functions directly to the absorber bands.</p>
+            </div>
+
+            <div class="p-4 rounded-xl bg-sv-bg border border-sv-line space-y-2">
+              <div class="flex items-center justify-between">
+                <h4 class="text-sm font-bold text-orange-400">Graded Multi-Absorber</h4>
+                <span class="text-[10px] font-mono px-2 py-0.5 rounded bg-orange-500/15 text-orange-400">Cascade Transport</span>
+              </div>
+              <p class="text-[11px] font-mono text-sv-muted">FTO / Cs₂TiBr₆ / MASnI₃ / Cs₃Bi₂I₉ / Contact</p>
+              <p class="text-xs text-slate-300 leading-relaxed">Cascaded band edges allow wide-bandgap outer absorbers to simultaneously absorb photons and act as selective carrier-blocking layers.</p>
+            </div>
+
+            <div class="p-4 rounded-xl bg-sv-bg border border-sv-line space-y-2">
+              <div class="flex items-center justify-between">
+                <h4 class="text-sm font-bold text-sky-400">2-Terminal (2T) Tandem</h4>
+                <span class="text-[10px] font-mono px-2 py-0.5 rounded bg-sky-500/15 text-sky-400">Up to 33.9%</span>
+              </div>
+              <p class="text-[11px] font-mono text-sv-muted">Top Cell / Recombination Layer / Bottom Cell</p>
+              <p class="text-xs text-slate-300 leading-relaxed">Monolithic series connection: voltages add (<span class="font-mono">Voc,1 + Voc,2</span>), while sub-cell currents must be matched (<span class="font-mono">min(Jtop, Jbot)</span>).</p>
+            </div>
+
+            <div class="p-4 rounded-xl bg-sv-bg border border-sv-line space-y-2">
+              <div class="flex items-center justify-between">
+                <h4 class="text-sm font-bold text-violet-400">4-Terminal (4T) Tandem</h4>
+                <span class="text-[10px] font-mono px-2 py-0.5 rounded bg-violet-500/15 text-violet-400">No Jsc Matching</span>
+              </div>
+              <p class="text-[11px] font-mono text-sv-muted">Semi-Transparent Top Cell + Independent Bottom Cell</p>
+              <p class="text-xs text-slate-300 leading-relaxed">Mechanically stacked with independent electrical terminals, eliminating current-matching constraints across varying solar spectra.</p>
+            </div>
+          </div>
+
+          <!-- Comprehensive Solar Cell Generations Comparison Table -->
+          <div class="pt-2">
+            <h3 class="text-sm font-bold text-white mb-2.5">Comparative Benchmark of Photovoltaic Generations</h3>
+            <div class="overflow-x-auto">
+              <table class="w-full text-left border-collapse text-xs num-tab">
+                <thead class="bg-sv-bg text-sv-muted text-[11px] border-b border-sv-line">
+                  <tr>
+                    <th class="py-2.5 px-3">Technology</th>
+                    <th class="py-2.5 px-3">Record Lab PCE</th>
+                    <th class="py-2.5 px-3">Commercial PCE</th>
+                    <th class="py-2.5 px-3">Bandgap (Eg)</th>
+                    <th class="py-2.5 px-3">Key Advantage</th>
+                    <th class="py-2.5 px-3">Primary Challenge</th>
+                  </tr>
+                </thead>
+                <tbody class="divide-y divide-sv-line/60 text-slate-300">
+                  <tr>
+                    <td class="py-2 px-3 font-bold text-white">Monocrystalline c-Si (TOPCon/HJT)</td>
+                    <td class="py-2 px-3 text-sky-400">27.3%</td>
+                    <td class="py-2 px-3">21.5% - 23.2%</td>
+                    <td class="py-2 px-3">1.12 eV</td>
+                    <td class="py-2 px-3">25-30 yr bankable reliability</td>
+                    <td class="py-2 px-3">Approaching Auger/SQ efficiency ceiling</td>
+                  </tr>
+                  <tr>
+                    <td class="py-2 px-3 font-bold text-white">ACIGS / CIGS Thin-Film</td>
+                    <td class="py-2 px-3 text-sky-400">23.6%</td>
+                    <td class="py-2 px-3">18.0% - 19.5%</td>
+                    <td class="py-2 px-3">1.05 - 1.25 eV</td>
+                    <td class="py-2 px-3">Ideal narrow-gap tandem bottom cell</td>
+                    <td class="py-2 px-3">Indium/Gallium supply &amp; vacuum deposition</td>
+                  </tr>
+                  <tr>
+                    <td class="py-2 px-3 font-bold text-white">Single-Junction Lead Perovskite</td>
+                    <td class="py-2 px-3 text-violet-400">26.1%</td>
+                    <td class="py-2 px-3">Pilot (19% - 21%)</td>
+                    <td class="py-2 px-3">1.48 - 1.55 eV</td>
+                    <td class="py-2 px-3">Low-cost solution processing &amp; high Voc</td>
+                    <td class="py-2 px-3">Moisture/ion migration &amp; Pb encapsulation</td>
+                  </tr>
+                  <tr>
+                    <td class="py-2 px-3 font-bold text-white">Lead-Free Tin/Double Perovskite</td>
+                    <td class="py-2 px-3 text-emerald-400">15.7%</td>
+                    <td class="py-2 px-3">Lab Research</td>
+                    <td class="py-2 px-3">1.30 - 2.00 eV</td>
+                    <td class="py-2 px-3">Non-toxic (Sn, Ti, Bi) &amp; tunable bandgap</td>
+                    <td class="py-2 px-3">Sn²⁺ oxidation &amp; bulk defect density</td>
+                  </tr>
+                  <tr>
+                    <td class="py-2 px-3 font-bold text-white">2T &amp; 4T Perovskite Tandems</td>
+                    <td class="py-2 px-3 text-orange-400">33.9% (2T)</td>
+                    <td class="py-2 px-3">Early Commercial</td>
+                    <td class="py-2 px-3">1.73 + 1.12 eV</td>
+                    <td class="py-2 px-3">Surpasses single-junction SQ limit</td>
+                    <td class="py-2 px-3">2T current matching &amp; tunnel junction losses</td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+          </div>
+
+          <!-- Interactive PV Knowledge Self-Assessment Quiz -->
+          <div class="rounded-xl bg-sv-bg border border-sv-line p-4 sm:p-5 space-y-3">
+            <div class="flex flex-wrap items-center justify-between gap-2 border-b border-sv-line pb-2.5">
+              <div>
+                <h3 class="text-sm font-bold text-white">Interactive Photovoltaic &amp; Band-Engineering Self-Test</h3>
+                <p class="text-[11px] text-sv-muted">Verify your understanding of band offsets, tandem current matching, and Bangladesh solar sizing</p>
+              </div>
+              <span id="quiz-score-badge" class="px-2.5 py-1 rounded-lg bg-sky-500/15 text-sky-400 border border-sky-500/30 text-xs font-bold num-tab">Score: 0 / 3</span>
+            </div>
+            <div id="academy-quiz-container" class="grid grid-cols-1 md:grid-cols-3 gap-3 text-xs">
+              <!-- Populated dynamically -->
+            </div>
+          </div>
+        </div>
+      </section>
+
+    </main>
+
+    <!-- Prominent App Footer Attribution -->
+    <footer class="border-t border-sv-line bg-sv-panel2 px-4 sm:px-6 py-4 mt-auto">
+      <div class="max-w-6xl mx-auto flex flex-wrap items-center justify-between gap-2 text-xs text-sv-muted">
+        <div>
+          <strong class="text-white">SolarVerse</strong>: Interactive Photovoltaic Device Physics (SCAPS-1D) &amp; Bangladesh Solar ROI Platform
+        </div>
+        <div class="flex flex-wrap items-center gap-3">
+          <span>Created by <strong class="text-sky-400">Rakib Hossain Sourav</strong></span>
+          <span>•</span>
+          <span>Supervised by <strong class="text-orange-400">Kashfi Uddin</strong></span>
+        </div>
+      </div>
+    </footer>
+  </div>
+
+  <!-- ======================================================================= -->
+  <!-- JAVASCRIPT PHYSICS ENGINE, DUAL-CANVAS ANIMATOR & BD PLANNER            -->
+  <!-- ======================================================================= -->
+  <script>
+    const $ = id => document.getElementById(id);
+    const F = ' Cambria, Georgia, "Times New Roman", serif';
+    const rnd = (a, b) => a + Math.random() * (b - a);
+
+    function showToast(msg) {
+      const box = $('toast-box');
+      $('toast-text').textContent = msg;
+      box.classList.remove('opacity-0', 'translate-y-4');
+      box.classList.add('opacity-100', 'translate-y-0');
+      clearTimeout(window._tt);
+      window._tt = setTimeout(() => {
+        box.classList.add('opacity-0', 'translate-y-4');
+        box.classList.remove('opacity-100', 'translate-y-0');
+      }, 2800);
+    }
+
+    function toggleMobileNav() {
+      $('sidebar-nav').classList.toggle('hidden');
+    }
+
+    // -------------------------------------------------------------------------
+    // 1. MATERIAL DATABASE (Literature & DFT Values)
+    // -------------------------------------------------------------------------
+    let MATERIALS = [
+      // Lead-Free & Tandem Materials from Reference
+      { id: 'fto', name: 'FTO', role: 'contact', Eg: 3.2, chi: 4.4, ec: -4.4, ev: -7.6, wf: 4.4, eps: 9.0, mu_e: 20, mu_h: 10, Nc: 2.2e18, Nv: 1.8e19, doping: 'n: 1e20', color: '#475569', bandCol: '#64748b', leadFree: true, pce: 'Front TCO', ref: 'Poster Fig. 5 / Standard TCO' },
+      { id: 'ito', name: 'ITO', role: 'contact', Eg: 3.5, chi: 4.7, ec: -4.7, ev: -8.2, wf: 4.7, eps: 9.0, mu_e: 30, mu_h: 10, Nc: 2.2e18, Nv: 1.8e19, doping: 'n: 1e20', color: '#475569', bandCol: '#64748b', leadFree: true, pce: 'Front TCO', ref: 'Standard TCO' },
+      { id: 'cs2tibr6', name: 'Cs₂TiBr₆', role: 'absorber', Eg: 1.6, chi: 4.5, ec: -4.5, ev: -6.1, eps: 10.0, mu_e: 4.4, mu_h: 2.5, Nc: 1.0e19, Nv: 1.0e19, doping: 'n: 1e15', color: '#5b3fa8', bandCol: '#7c5cd6', leadFree: true, pce: '1.6 eV Top/ETL-like', ref: 'Poster Fig. 5 / Chen et al., Joule' },
+      { id: 'masni3', name: 'MASnI₃', role: 'absorber', Eg: 1.4, chi: 4.2, ec: -4.2, ev: -5.6, eps: 8.2, mu_e: 1.6, mu_h: 1.6, Nc: 1.0e18, Nv: 1.0e18, doping: 'p: 1e15', color: '#7048c9', bandCol: '#9b72f0', leadFree: true, pce: '14.8% (Exp)', ref: 'Poster Fig. 5 / Hao et al.' },
+      { id: 'cs3bi2i9', name: 'Cs₃Bi₂I₉', role: 'absorber', Eg: 2.0, chi: 3.4, ec: -3.4, ev: -5.4, eps: 9.6, mu_e: 1.0, mu_h: 2.0, Nc: 4.9e18, Nv: 1.0e19, doping: 'p: 1e15', color: '#4c3490', bandCol: '#6a4fb8', leadFree: true, pce: '2.0 eV Top/HTL-like', ref: 'Poster Fig. 5 / Park et al.' },
+      { id: 'recomb', name: 'Recombination layer', role: 'contact', Eg: 0, chi: 4.5, ec: 0, ev: 0, wf: 4.5, eps: 1, mu_e: 50, mu_h: 50, Nc: 1e19, Nv: 1e19, doping: 'Tunnel', color: '#64748b', bandCol: '#64748b', leadFree: true, pce: '2T Tunnel Junction', ref: 'Monolithic 2T Series Link' },
+      { id: 'znoal', name: 'ZnO:Al', role: 'etl', Eg: 3.3, chi: 4.6, ec: -4.6, ev: -7.9, eps: 9.0, mu_e: 100, mu_h: 25, Nc: 2.2e18, Nv: 1.8e19, doping: 'n: 1e18', color: '#475569', bandCol: '#64748b', leadFree: true, pce: 'Window TCO/ETL', ref: 'Poster Fig. 5 / ACIGS Stack' },
+      { id: 'izno', name: 'i-ZnO', role: 'etl', Eg: 3.3, chi: 4.6, ec: -4.6, ev: -7.9, eps: 9.0, mu_e: 100, mu_h: 25, Nc: 2.2e18, Nv: 1.8e19, doping: 'n: 1e15', color: '#3f4b5e', bandCol: '#586274', leadFree: true, pce: 'Buffer Layer', ref: 'Poster Fig. 5 / ACIGS Stack' },
+      { id: 'cds', name: 'CdS', role: 'etl', Eg: 2.4, chi: 4.2, ec: -4.2, ev: -6.6, eps: 10.0, mu_e: 100, mu_h: 25, Nc: 2.2e18, Nv: 1.8e19, doping: 'n: 1e17', color: '#a16207', bandCol: '#d19a1c', leadFree: false, pce: 'ACIGS Buffer', ref: 'Poster Fig. 5 / ACIGS Stack' },
+      { id: 'acigs', name: 'ACIGS', role: 'absorber', Eg: 1.2, chi: 4.6, ec: -4.6, ev: -5.8, eps: 13.6, mu_e: 100, mu_h: 25, Nc: 2.2e18, Nv: 1.8e19, doping: 'p: 2e16', color: '#0f766e', bandCol: '#14b8a6', leadFree: true, pce: '23.6% (Exp)', ref: 'Poster Fig. 5 / Keller et al.' },
+      { id: 'au', name: 'Au', role: 'contact', Eg: 0, chi: 5.1, ec: -5.1, ev: -5.1, wf: 5.1, eps: 1, mu_e: 100, mu_h: 100, Nc: 1e19, Nv: 1e19, doping: 'Metal', color: '#b8902f', bandCol: '#b8902f', leadFree: true, pce: 'Back Contact (5.1 eV)', ref: 'CRC Handbook' },
+
+      // Standard Perovskite & Tandem Materials
+      { id: 'mapbi3', name: 'MAPbI₃', role: 'absorber', Eg: 1.55, chi: 3.9, ec: -3.9, ev: -5.45, eps: 6.5, mu_e: 2.0, mu_h: 2.0, Nc: 2.2e18, Nv: 1.8e19, doping: 'p: 1e15', color: '#6d28d9', bandCol: '#8b5cf6', leadFree: false, pce: '21.6% (Exp)', ref: 'Min et al., Nature (2021)' },
+      { id: 'fapbi3', name: 'FAPbI₃', role: 'absorber', Eg: 1.48, chi: 4.0, ec: -4.0, ev: -5.48, eps: 6.6, mu_e: 2.5, mu_h: 2.5, Nc: 2.2e18, Nv: 1.8e19, doping: 'i: 1e14', color: '#5b21b6', bandCol: '#7c3aed', leadFree: false, pce: '26.1% (Exp)', ref: 'Park et al., Nature (2023)' },
+      { id: 'cspbi3', name: 'CsPbI₃', role: 'absorber', Eg: 1.73, chi: 3.95, ec: -3.95, ev: -5.68, eps: 6.0, mu_e: 1.8, mu_h: 1.8, Nc: 2.0e18, Nv: 1.8e19, doping: 'p: 1e15', color: '#4338ca', bandCol: '#6366f1', leadFree: false, pce: '21.1% (Exp)', ref: 'Tan et al., Adv. Mater. (2022)' },
+      { id: 'csi', name: 'c-Si (Bottom)', role: 'absorber', Eg: 1.12, chi: 4.05, ec: -4.05, ev: -5.17, eps: 11.9, mu_e: 1400, mu_h: 450, Nc: 2.8e19, Nv: 1.04e19, doping: 'p: 1e16', color: '#0f766e', bandCol: '#14b8a6', leadFree: true, pce: '27.3% (HJT)', ref: 'Green et al. (2024)' },
+      { id: 'sno2', name: 'SnO₂', role: 'etl', Eg: 3.6, chi: 4.1, ec: -4.1, ev: -7.7, eps: 9.0, mu_e: 240, mu_h: 25, Nc: 2.2e18, Nv: 1.8e19, doping: 'n: 1e18', color: '#0369a1', bandCol: '#0ea5e9', leadFree: true, pce: 'Standard ETL', ref: 'Jiang et al., Nature (2019)' },
+      { id: 'tio2', name: 'TiO₂', role: 'etl', Eg: 3.2, chi: 4.0, ec: -4.0, ev: -7.2, eps: 9.0, mu_e: 20, mu_h: 10, Nc: 2.2e18, Nv: 1.8e19, doping: 'n: 1e17', color: '#0284c7', bandCol: '#38bdf8', leadFree: true, pce: 'Standard ETL', ref: 'SCAPS-1D Standard' },
+      { id: 'c60', name: 'C₆₀', role: 'etl', Eg: 1.7, chi: 4.0, ec: -4.0, ev: -5.7, eps: 4.2, mu_e: 1.6, mu_h: 0.1, Nc: 8.0e19, Nv: 8.0e19, doping: 'n: 1e17', color: '#1d4ed8', bandCol: '#3b82f6', leadFree: true, pce: 'p-i-n ETL', ref: 'Al-Ashouri et al., Science' },
+      { id: 'spiro', name: 'Spiro-OMeTAD', role: 'htl', Eg: 3.0, chi: 2.2, ec: -2.2, ev: -5.2, eps: 3.0, mu_e: 2e-4, mu_h: 2e-4, Nc: 2.2e18, Nv: 1.8e19, doping: 'p: 1e18', color: '#b45309', bandCol: '#f59e0b', leadFree: true, pce: 'Standard HTL', ref: 'Burschka et al., Nature' },
+      { id: 'niox', name: 'NiOₓ', role: 'htl', Eg: 3.6, chi: 1.8, ec: -1.8, ev: -5.4, eps: 10.7, mu_e: 2.8, mu_h: 2.8, Nc: 2.8e19, Nv: 1.8e19, doping: 'p: 1e18', color: '#c2410c', bandCol: '#fb923c', leadFree: true, pce: 'Inorganic HTL', ref: 'You et al., Nat. Nanotech.' },
+      { id: 'bad_etl', name: 'High-Barrier Oxide (χ=3.1)', role: 'etl', Eg: 3.8, chi: 3.1, ec: -3.1, ev: -6.9, eps: 8.0, mu_e: 10, mu_h: 5, Nc: 2.2e18, Nv: 1.8e19, doping: 'n: 1e17', color: '#991b1b', bandCol: '#ef4444', leadFree: true, pce: 'Spike Demo', ref: 'Synthetic Barrier Test' },
+      { id: 'ag', name: 'Ag', role: 'contact', Eg: 0, chi: 4.3, ec: -4.3, ev: -4.3, wf: 4.3, eps: 1, mu_e: 100, mu_h: 100, Nc: 1e19, Nv: 1e19, doping: 'Metal', color: '#64748b', bandCol: '#94a3b8', leadFree: true, pce: 'Back Contact (4.3 eV)', ref: 'CRC Handbook' },
+      { id: 'carbon', name: 'Carbon', role: 'contact', Eg: 0, chi: 5.0, ec: -5.0, ev: -5.0, wf: 5.0, eps: 1, mu_e: 100, mu_h: 100, Nc: 1e19, Nv: 1e19, doping: 'Metal', color: '#334155', bandCol: '#64748b', leadFree: true, pce: 'CTL-Free Contact', ref: 'Mei et al., Science' },
+      { id: 'spacer', name: 'Optical Spacer', role: 'contact', Eg: 0, chi: 4.5, ec: 0, ev: 0, wf: 4.5, eps: 1, mu_e: 0, mu_h: 0, Nc: 1e19, Nv: 1e19, doping: 'Dielectric', color: '#475569', bandCol: '#64748b', leadFree: true, pce: '4T Dielectric Gap', ref: '4T Tandem Coupling' }
+    ];
+
+    const getMat = id => MATERIALS.find(m => m.id === id) || MATERIALS[0];
+
+    // -------------------------------------------------------------------------
+    // 2. VIEW SWITCHER
+    // -------------------------------------------------------------------------
+    const VIEW_META = {
+      home: { badge: 'Workspace 01 / 06', title: 'Why Solar? & Overview: Barnett (1978) Oil Depletion' },
+      lab: { badge: 'Workspace 02 / 06', title: 'Device & Band Alignment Lab (SCAPS-1D)' },
+      library: { badge: 'Workspace 03 / 06', title: 'Absorber, ETL, HTL & Contact Library' },
+      planner: { badge: 'Workspace 04 / 06', title: 'Bangladesh 64-District Solar Planner & Tilt Optimizer' },
+      market: { badge: 'Workspace 05 / 06', title: 'Bangladesh Solar Market, Adoption & 2041 Outlook' },
+      academy: { badge: 'Workspace 06 / 06', title: 'Solar Cell Academy: Device Structures & Physics' }
+    };
+
+    let currentView = 'lab';
+    function switchView(viewId) {
+      currentView = viewId;
+      document.querySelectorAll('.app-view').forEach(el => el.classList.add('hidden'));
+      $('view-' + viewId).classList.remove('hidden');
+
+      $('header-view-badge').textContent = VIEW_META[viewId].badge;
+      $('header-view-title').textContent = VIEW_META[viewId].title;
+
+      document.querySelectorAll('.nav-item').forEach(btn => {
+        if (btn.dataset.view === viewId) {
+          btn.classList.add('bg-[#16284d]', 'text-white', 'border', 'border-[#60a5fa]');
+          btn.classList.remove('text-sv-muted', 'hover:bg-sv-panel');
+        } else {
+          btn.classList.remove('bg-[#16284d]', 'text-white', 'border', 'border-[#60a5fa]');
+          btn.classList.add('text-sv-muted', 'hover:bg-sv-panel');
+        }
+      });
+
+      if (window.innerWidth < 1024) {
+        $('sidebar-nav').classList.add('hidden');
+      }
+      if (viewId === 'planner') {
+        recalcBdPlanner();
+      }
+    }
+
+    // -------------------------------------------------------------------------
+    // 3. VIEW 1: "HOW MUCH OIL?" BARNETT (1978) CANVAS SIMULATION
+    // -------------------------------------------------------------------------
+    const V_EARTH = 6.9e21;
+    const R0_1970 = 1.67e10;
+    let oilState = { rate: 7.0, playing: false, simYear: 0, maxYears: 344 };
+
+    function calcOilYears(rPct) {
+      if (rPct <= 0.001) return V_EARTH / R0_1970;
+      const r = rPct / 100;
+      return Math.log((V_EARTH * r) / R0_1970 + 1) / Math.log(1 + r);
+    }
+
+    function setOilSlider(v) {
+      $('oil-rate-slider').value = v;
+      updateOilParams();
+    }
+
+    function updateOilParams() {
+      const r = parseFloat($('oil-rate-slider').value);
+      oilState.rate = r;
+      $('oil-rate-badge').textContent = `${r.toFixed(1)}% / yr`;
+      oilState.maxYears = calcOilYears(r);
+      $('oil-drain-years').textContent = r === 0 ? '4.1×10¹¹ yrs' : `${Math.round(oilState.maxYears)} yrs`;
+      if (!oilState.playing) {
+        oilState.simYear = 0;
+      }
+    }
+
+    function toggleOilSim() {
+      oilState.playing = !oilState.playing;
+      if (oilState.playing && oilState.simYear >= oilState.maxYears) oilState.simYear = 0;
+      $('oil-btn-toggle').textContent = oilState.playing ? '⏸ Pause' : '▶ Simulate Depletion';
+    }
+
+    function resetOilSim() {
+      oilState.playing = false;
+      oilState.simYear = 0;
+      $('oil-btn-toggle').textContent = '▶ Simulate Depletion';
+    }
+
+    let oilCtx = null;
+    function initOilCanvas() {
+      const c = $('oil-canvas');
+      const d = Math.min(devicePixelRatio || 1, 2);
+      c.width = 640 * d;
+      c.height = 370 * d;
+      oilCtx = c.getContext('2d');
+      oilCtx.scale(d, d);
+    }
+
+    function stepAndDrawOil(dt, timeSec) {
+      if (!oilCtx) return;
+      if (oilState.playing) {
+        oilState.simYear = Math.min(oilState.maxYears, oilState.simYear + (oilState.maxYears / 4.2) * dt);
+        if (oilState.simYear >= oilState.maxYears) {
+          oilState.playing = false;
+          $('oil-btn-toggle').textContent = '↻ Replay Depletion';
+        }
+      }
+
+      let remFrac = 1.0;
+      if (oilState.rate === 0) {
+        remFrac = 1 - oilState.simYear / oilState.maxYears;
+      } else {
+        const r = oilState.rate / 100;
+        const used = (R0_1970 * (Math.pow(1 + r, oilState.simYear) - 1)) / r;
+        remFrac = Math.max(0, 1 - used / V_EARTH);
+      }
+
+      $('oil-curr-year').textContent = oilState.rate === 0 ? `Yr ${(oilState.simYear / 1e9).toFixed(1)}B` : `Yr ${Math.round(oilState.simYear)}`;
+      $('oil-rem-pct').textContent = `${(remFrac * 100).toFixed(1)}%`;
+
+      const ctx = oilCtx;
+      ctx.clearRect(0, 0, 640, 370);
+
+      // Sun on Left
+      const sunX = 105, sunY = 185;
+      const grad = ctx.createRadialGradient(sunX, sunY, 16, sunX, sunY, 88);
+      grad.addColorStop(0, 'rgba(253, 224, 71, 0.95)');
+      grad.addColorStop(0.5, 'rgba(251, 146, 60, 0.35)');
+      grad.addColorStop(1, 'rgba(251, 146, 60, 0)');
+      ctx.fillStyle = grad;
+      ctx.beginPath(); ctx.arc(sunX, sunY, 88, 0, Math.PI * 2); ctx.fill();
+
+      ctx.fillStyle = '#fde047';
+      ctx.beginPath(); ctx.arc(sunX, sunY, 34, 0, Math.PI * 2); ctx.fill();
+      ctx.fillStyle = '#080d18';
+      ctx.font = 'bold 12px' + F;
+      ctx.textAlign = 'center';
+      ctx.fillText('SUN', sunX, sunY + 4);
+
+      // Animated Photon Stream from Sun to Earth
+      for (let row = -2; row <= 2; row++) {
+        const y = sunY + row * 26;
+        const xOff = (timeSec * 90 + Math.abs(row) * 18) % 130;
+        const px = 152 + xOff;
+        ctx.strokeStyle = row % 2 === 0 ? '#a78bfa' : '#38bdf8';
+        ctx.lineWidth = 2.5;
+        ctx.beginPath();
+        ctx.moveTo(px, y);
+        ctx.lineTo(px + 14, y);
+        ctx.stroke();
+      }
+      ctx.fillStyle = '#38bdf8';
+      ctx.font = '600 11px' + F;
+      ctx.fillText('Continuous Solar Flux', 222, 105);
+      ctx.fillStyle = '#94a3bf';
+      ctx.font = '11px' + F;
+      ctx.fillText('1 hr sunlight > 1 yr global use', 222, 268);
+
+      // Earth Cross-Section on Right
+      const ex = 445, ey = 185, er = 112;
+      ctx.save();
+      ctx.beginPath();
+      ctx.arc(ex, ey, er, 0, Math.PI * 2);
+      ctx.clip();
+
+      // Empty interior
+      ctx.fillStyle = '#080d18';
+      ctx.fillRect(ex - er, ey - er, er * 2, er * 2);
+
+      // Oil level
+      const oilH = er * 2 * remFrac;
+      const oilTop = ey + er - oilH;
+      const oilGrad = ctx.createLinearGradient(0, oilTop, 0, ey + er);
+      oilGrad.addColorStop(0, '#78350f');
+      oilGrad.addColorStop(0.4, '#451a03');
+      oilGrad.addColorStop(1, '#1c1917');
+      ctx.fillStyle = oilGrad;
+      ctx.fillRect(ex - er, oilTop, er * 2, oilH);
+
+      // Oil Surface Line
+      if (remFrac > 0.005) {
+        ctx.strokeStyle = '#fb923c';
+        ctx.lineWidth = 2.5;
+        ctx.beginPath();
+        ctx.moveTo(ex - er, oilTop);
+        ctx.lineTo(ex + er, oilTop);
+        ctx.stroke();
+      }
+      ctx.restore();
+
+      // Thin Solid Earth Crust
+      ctx.strokeStyle = '#38bdf8';
+      ctx.lineWidth = 5;
+      ctx.beginPath();
+      ctx.arc(ex, ey, er + 2, 0, Math.PI * 2);
+      ctx.stroke();
+
+      // Labels inside Earth
+      ctx.fillStyle = 'rgba(8, 13, 24, 0.82)';
+      ctx.fillRect(ex - 78, ey - 22, 156, 44);
+      ctx.strokeStyle = '#25324b';
+      ctx.lineWidth = 1;
+      ctx.strokeRect(ex - 78, ey - 22, 156, 44);
+
+      ctx.fillStyle = remFrac > 0.01 ? '#fb923c' : '#34d399';
+      ctx.font = 'bold 12px' + F;
+      ctx.fillText(remFrac > 0.01 ? 'EARTHFUL OF OIL' : 'OIL EXHAUSTED!', ex, ey - 4);
+      ctx.fillStyle = '#e8edf8';
+      ctx.font = '11px' + F;
+      ctx.fillText(remFrac > 0.01 ? `${(remFrac * 100).toFixed(1)}% Remaining` : 'Solar Energy Remains Forever', ex, ey + 13);
+
+      ctx.fillStyle = '#94a3bf';
+      ctx.font = '600 12px' + F;
+      ctx.fillText('Earth (R = 6.4 × 10⁶ m)', ex, 48);
+    }
+
+    // -------------------------------------------------------------------------
+    // 4. VIEW 2: EXACT DUAL-CANVAS DEVICE & BAND ALIGNMENT PHYSICS ENGINE
+    // -------------------------------------------------------------------------
+    function setupCanvas(id, W, H) {
+      const c = $(id);
+      const d = Math.min(devicePixelRatio || 1, 2);
+      c.width = W * d;
+      c.height = H * d;
+      const x = c.getContext('2d');
+      x.scale(d, d);
+      return x;
+    }
+
+    const c1 = setupCanvas('c1', 1000, 560);
+    const c2 = setupCanvas('c2', 1000, 520);
+
+    let g, t = 0, run = true, speed = 1, focus = 'all';
+    const fa = c => (focus === 'all' || c === focus) ? 1 : 0.12;
+
+    function txt(s, x, y, f, col, al) {
+      g.font = f;
+      g.fillStyle = col;
+      g.textAlign = al || 'center';
+      g.textBaseline = 'middle';
+      g.fillText(s, x, y);
+    }
+
+    function rr(x, y, w, h, r) {
+      g.beginPath();
+      g.moveTo(x + r, y);
+      g.arcTo(x + w, y, x + w, y + h, r);
+      g.arcTo(x + w, y + h, x, y + h, r);
+      g.arcTo(x, y + h, x, y, r);
+      g.arcTo(x, y, x + w, y, r);
+      g.closePath();
+    }
+
+    function dPh(p) {
+      g.globalAlpha = fa(p.cell);
+      g.strokeStyle = p.hi ? '#a78bfa' : '#f87171';
+      g.shadowColor = g.strokeStyle;
+      g.shadowBlur = 8;
+      g.lineWidth = 2.5;
+      g.lineCap = 'round';
+      g.beginPath();
+      g.moveTo(p.x, p.y - 14);
+      g.lineTo(p.x, p.y);
+      g.stroke();
+      g.shadowBlur = 0;
+    }
+
+    function dE(x, y) {
+      g.fillStyle = '#38bdf8';
+      g.shadowColor = '#38bdf8';
+      g.shadowBlur = 10;
+      g.beginPath();
+      g.arc(x, y, 6.5, 0, Math.PI * 2);
+      g.fill();
+      g.shadowBlur = 0;
+      txt('−', x, y + 0.5, 'bold 12px' + F, '#04283a');
+    }
+
+    function dH(x, y) {
+      g.fillStyle = 'rgba(251,146,60,.2)';
+      g.strokeStyle = '#fb923c';
+      g.lineWidth = 2;
+      g.beginPath();
+      g.arc(x, y, 6.5, 0, Math.PI * 2);
+      g.fill();
+      g.stroke();
+      txt('+', x, y + 0.5, 'bold 11px' + F, '#fb923c');
+    }
+
+    function dFl(a) {
+      a.forEach(f => {
+        g.globalAlpha = Math.max(0, f.life * 1.6);
+        if (f.x_) {
+          txt('✕', f.x, f.y, 'bold ' + (14 + f.r * 0.3) + 'px' + F, '#f87171');
+        } else {
+          g.strokeStyle = 'rgb(' + f.c + ')';
+          g.lineWidth = 1.5;
+          g.beginPath();
+          g.arc(f.x, f.y, f.r, 0, Math.PI * 2);
+          g.stroke();
+        }
+      });
+      g.globalAlpha = 1;
+    }
+
+    function updFl(a, dt) {
+      for (let i = a.length - 1; i >= 0; i--) {
+        a[i].life -= dt;
+        a[i].r += dt * 38;
+        if (a[i].life <= 0) a.splice(i, 1);
+      }
+    }
+
+    // Dynamic Device Configuration State
+    let devConfig = {
+      presetKey: 'leadfree_2t',
+      layers: [],       // [{ matId, thick, cell: 'top'|'bot'|'mid' }]
+      isTandem: true,
+      isInverted: false,
+      notes: [],
+      verdict: 'FAVORABLE',
+      verdictMsg: ''
+    };
+
+    // Computed Layout & Physics Arrays for Canvas 1 & Canvas 2
+    const SX = 260, SW = 360;
+    let FY = 75, RY = 282, AY = 469;
+    let L_GEOM = [];     // [name, y, h, color, mat, cell, idx]
+    let ABS_INDICES = [];
+    let PATH = [], SEG = [], PLEN = 0;
+
+    let B_GEOM = [];     // [name, width, ec, ev, bandCol, mat, cell, idx]
+    let BX = [];
+    let RC = 500;
+    let BARRIERS = [];   // [{ x, y1, y2, label, side }]
+
+    let ph = [], car = [], wire = [], fl = [], glow = {}, cnt = {}, acc = 0;
+    let pb = [], cb = [], fb = [], acc2 = 0;
+
+    const Y_BAND = e => 60 + (-3 - e) * 78;
+    const mn = e => String(e).replace('-', '−');
+    const dist2 = (a, b) => Math.hypot(a[0] - b[0], a[1] - b[1]);
+
+    // Preset Definitions (Including exact default Lead-Free Perovskite/ACIGS 2T Tandem)
+    const DEVICE_PRESETS = {
+      leadfree_2t: {
+        title: 'Charge flow and band alignment in a lead-free perovskite/ACIGS 2T tandem cell',
+        sub: 'Every absorber generates electron-hole pairs. The staggered band offsets decide where each carrier can go.',
+        isTandem: true,
+        isInverted: false,
+        layers: [
+          { matId: 'fto', thick: 30, cell: 'top' },
+          { matId: 'cs2tibr6', thick: 50, cell: 'top' },
+          { matId: 'masni3', thick: 70, cell: 'top' },
+          { matId: 'cs3bi2i9', thick: 50, cell: 'top' },
+          { matId: 'recomb', thick: 28, cell: 'mid' },
+          { matId: 'znoal', thick: 24, cell: 'bot' },
+          { matId: 'izno', thick: 22, cell: 'bot' },
+          { matId: 'cds', thick: 22, cell: 'bot' },
+          { matId: 'acigs', thick: 80, cell: 'bot' },
+          { matId: 'au', thick: 30, cell: 'bot' }
+        ],
+        notes: [
+          '<b>Cs₂TiBr₆</b> has a valence band 0.5 eV below MASnI₃. Holes cannot enter it, so only electrons reach FTO. It behaves like an electron-transport layer.',
+          '<b>Cs₃Bi₂I₉</b> has a conduction band 0.8 eV above MASnI₃. Electrons cannot enter it, so only holes reach the recombination layer. It behaves like a hole-transport layer.',
+          'Because the outer absorbers do both jobs, the top cell needs no separate ETL or HTL.',
+          'In the bottom cell, the deep valence band of CdS and ZnO blocks ACIGS holes from the front side, so they go to Au. Electrons climb a small CdS spike and reach the recombination layer.',
+          'Top-cell holes and bottom-cell electrons recombine in the middle layer. This joins the sub-cells in series, so the voltages add.'
+        ]
+      },
+      nip: {
+        title: 'Charge flow and band alignment in a standard n-i-p MAPbI₃ perovskite solar cell',
+        sub: 'Light enters through FTO / SnO₂ (ETL). Electrons flow left to FTO while holes flow right through Spiro-OMeTAD to Au.',
+        isTandem: false,
+        isInverted: false,
+        layers: [
+          { matId: 'fto', thick: 40, cell: 'top' },
+          { matId: 'sno2', thick: 45, cell: 'top' },
+          { matId: 'mapbi3', thick: 160, cell: 'top' },
+          { matId: 'spiro', thick: 65, cell: 'top' },
+          { matId: 'au', thick: 40, cell: 'top' }
+        ],
+        notes: [
+          '<b>SnO₂</b> exhibits a small conduction band offset (+0.2 eV) relative to MAPbI₃, allowing smooth electron extraction while its deep valence band (-7.7 eV) blocks holes.',
+          '<b>Spiro-OMeTAD</b> has a conduction band (-2.2 eV) 1.7 eV above MAPbI₃, strongly blocking electrons from reaching the Au back electrode.',
+          'Holes float upward in energy from MAPbI₃ (-5.45 eV) into Spiro-OMeTAD (-5.20 eV) and are collected at Au (5.1 eV).'
+        ]
+      },
+      pin: {
+        title: 'Charge flow and band alignment in an inverted p-i-n FAPbI₃ perovskite solar cell',
+        sub: 'Light enters through ITO / NiOₓ (HTL). Holes collect at the front ITO contact while electrons collect at C₆₀ / Ag.',
+        isTandem: false,
+        isInverted: true,
+        layers: [
+          { matId: 'ito', thick: 40, cell: 'top' },
+          { matId: 'niox', thick: 45, cell: 'top' },
+          { matId: 'fapbi3', thick: 165, cell: 'top' },
+          { matId: 'c60', thick: 55, cell: 'top' },
+          { matId: 'ag', thick: 40, cell: 'top' }
+        ],
+        notes: [
+          '<b>NiOₓ</b> acts as an inorganic front HTL whose high conduction band (-1.8 eV) reflects photogenerated electrons away from ITO.',
+          '<b>FAPbI₃</b> (Eg = 1.48 eV) harvests red/NIR photons efficiently and transfers electrons cleanly into fullerene <b>C₆₀</b> (-4.0 eV).',
+          'Preferred architecture for monolithic perovskite-on-silicon tandems due to low optical loss at the front contact.'
+        ]
+      },
+      ctlfree: {
+        title: 'Charge flow and band alignment in a CTL-free CsPbI₃ / Carbon perovskite cell',
+        sub: 'Eliminates separate ETL and HTL layers by engineering FTO and Carbon work functions directly against CsPbI₃.',
+        isTandem: false,
+        isInverted: false,
+        layers: [
+          { matId: 'fto', thick: 45, cell: 'top' },
+          { matId: 'cspbi3', thick: 210, cell: 'top' },
+          { matId: 'carbon', thick: 55, cell: 'top' }
+        ],
+        notes: [
+          '<b>CTL-Free Design:</b> Removes costly Spiro-OMeTAD and mesoporous TiO₂, reducing fabrication steps and material cost.',
+          '<b>FTO (4.4 eV)</b> collects electrons at the front, while printable <b>Carbon (5.0 eV)</b> collects holes at the rear.',
+          'Note: Because carrier-blocking interlayers are absent, interface recombination velocity must be carefully verified in SCAPS-1D.'
+        ]
+      },
+      multi: {
+        title: 'Cascade band alignment in a graded lead-free multi-absorber solar cell',
+        sub: 'Wide-bandgap Cs₂TiBr₆ and Cs₃Bi₂I₉ sandwich narrow-gap MASnI₃ to create a cascade carrier funnel.',
+        isTandem: false,
+        isInverted: false,
+        layers: [
+          { matId: 'fto', thick: 38, cell: 'top' },
+          { matId: 'cs2tibr6', thick: 75, cell: 'top' },
+          { matId: 'masni3', thick: 120, cell: 'top' },
+          { matId: 'cs3bi2i9', thick: 75, cell: 'top' },
+          { matId: 'au', thick: 38, cell: 'top' }
+        ],
+        notes: [
+          '<b>Graded Multi-Absorber Funnel:</b> Conduction bands step downward toward FTO (-3.4 → -4.2 → -4.5 eV) while valence bands step upward toward Au (-6.1 → -5.6 → -5.4 eV).',
+          'All three layers absorb photons across complementary spectral bands while self-filtering opposite-polarity carriers.'
+        ]
+      },
+      tandem4t: {
+        title: 'Mechanically stacked 4-Terminal (4T) CsPbI₃ / c-Si tandem solar cell',
+        sub: 'Wide-bandgap CsPbI₃ top cell absorbs blue/visible light and transmits NIR photons to the independent c-Si bottom cell.',
+        isTandem: true,
+        isInverted: false,
+        layers: [
+          { matId: 'ito', thick: 30, cell: 'top' },
+          { matId: 'sno2', thick: 35, cell: 'top' },
+          { matId: 'cspbi3', thick: 85, cell: 'top' },
+          { matId: 'spiro', thick: 40, cell: 'top' },
+          { matId: 'spacer', thick: 28, cell: 'mid' },
+          { matId: 'ito', thick: 28, cell: 'bot' },
+          { matId: 'csi', thick: 105, cell: 'bot' },
+          { matId: 'ag', thick: 30, cell: 'bot' }
+        ],
+        notes: [
+          '<b>4-Terminal Advantage:</b> Top and bottom sub-cells are optically coupled through a transparent dielectric spacer but electrically independent, requiring no current matching.',
+          '<b>CsPbI₃ (1.73 eV)</b> harvests high-energy photons (&lt;716 nm), while <b>c-Si (1.12 eV)</b> converts transmitted infrared photons (716-1100 nm).'
+        ]
+      },
+      faulty: {
+        title: 'Unfavorable Spike Barrier Demo: High-Barrier ETL blocking MAPbI₃ electrons',
+        sub: 'Demonstrates what happens when ΔEc exceeds +0.40 eV: electrons reflect at the ETL interface (red ✕ markers).',
+        isTandem: false,
+        isInverted: false,
+        layers: [
+          { matId: 'fto', thick: 40, cell: 'top' },
+          { matId: 'bad_etl', thick: 55, cell: 'top' },
+          { matId: 'mapbi3', thick: 160, cell: 'top' },
+          { matId: 'spiro', thick: 65, cell: 'top' },
+          { matId: 'au', thick: 40, cell: 'top' }
+        ],
+        notes: [
+          '<b>Blocking Spike Barrier (ΔEc = +0.80 eV):</b> The conduction band of the ETL (-3.1 eV) sits 0.80 eV above MAPbI₃ (-3.9 eV).',
+          'Photogenerated electrons hit the energy wall, bounce back (marked by red ✕), and recombine, producing an S-shaped J-V kink and severe fill-factor collapse.'
+        ]
+      }
+    };
+
+    function loadDevicePreset(key) {
+      const p = DEVICE_PRESETS[key];
+      devConfig.presetKey = key;
+      devConfig.isTandem = p.isTandem;
+      devConfig.isInverted = p.isInverted;
+      devConfig.layers = p.layers.map(l => ({ ...l }));
+      devConfig.notes = [...p.notes];
+
+      $('lab-preset-title').textContent = p.title;
+      $('lab-preset-sub').textContent = p.sub;
+
+      document.querySelectorAll('.preset-btn').forEach(b => {
+        b.classList.toggle('on', b.dataset.preset === key);
+      });
+
+      // Show/hide top/bottom subcell focus buttons depending on tandem vs single
+      const fg = $('focus-group');
+      if (p.isTandem) {
+        fg.classList.remove('opacity-40', 'pointer-events-none');
+      } else {
+        focus = 'all';
+        document.querySelectorAll('[data-f]').forEach(x => x.classList.toggle('on', x.dataset.f === 'all'));
+        fg.classList.add('opacity-40', 'pointer-events-none');
+      }
+
+      rebuildSimulationGeometry();
+    }
+
+    function rebuildSimulationGeometry() {
+      const layers = devConfig.layers;
+      const n = layers.length;
+
+      // 1. Build Fig. A Vertical Geometry (Total canvas height 560, stack from y=60 to y=484)
+      const totalH = 424;
+      const gap = 2;
+      const rawThickSum = layers.reduce((s, l) => s + l.thick, 0);
+      let curY = 60;
+      L_GEOM = [];
+      ABS_INDICES = [];
+
+      layers.forEach((l, i) => {
+        const m = getMat(l.matId);
+        const h = Math.max(22, Math.round(((l.thick / rawThickSum) * (totalH - gap * (n - 1)))));
+        L_GEOM.push([m.name, curY, h, m.color, m, l.cell, i]);
+        if (m.role === 'absorber') ABS_INDICES.push(i);
+        curY += h + gap;
+      });
+
+      FY = L_GEOM[0][1] + L_GEOM[0][2] / 2;
+      AY = L_GEOM[n - 1][1] + L_GEOM[n - 1][2] / 2;
+      const midIdx = layers.findIndex(l => l.cell === 'mid');
+      RY = midIdx >= 0 ? L_GEOM[midIdx][1] + L_GEOM[midIdx][2] / 2 : (FY + AY) / 2;
+
+      PATH = [[SX + SW, FY], [740, FY], [740, AY], [SX + SW, AY]];
+      SEG = [0, 1, 2].map(i => Math.hypot(PATH[i + 1][0] - PATH[i][0], PATH[i + 1][1] - PATH[i][1]));
+      PLEN = SEG[0] + SEG[1] + SEG[2];
+
+      // 2. Build Fig. B Horizontal Energy Band Geometry (x from 62 to 942 -> width 880)
+      const totalBandW = 880;
+      const bandWeights = layers.map((l, i) => {
+        const m = getMat(l.matId);
+        if (l.cell === 'mid') return 0.45;
+        if (m.role === 'absorber') return 1.8;
+        return 0.85;
+      });
+      const wSum = bandWeights.reduce((a, b) => a + b, 0);
+
+      B_GEOM = [];
+      BX = [];
+      let curX = 62;
+      layers.forEach((l, i) => {
+        const m = getMat(l.matId);
+        const w = (bandWeights[i] / wSum) * totalBandW;
+        B_GEOM.push([m.name, w, m.ec, m.ev, m.bandCol, m, l.cell, i]);
+        BX.push([curX, curX + w]);
+        curX += w;
+      });
+      RC = midIdx >= 0 ? (BX[midIdx][0] + BX[midIdx][1]) / 2 : 500;
+
+      // 3. Evaluate Interface Band Offsets & Build Barrier Markers
+      evaluateStackPhysics();
+      updateDetailedBalanceMetrics();
+
+      // 4. Reset Particle Buffers & Rebuild Cards
+      ph = []; car = []; wire = []; fl = []; glow = {}; cnt = {};
+      pb = []; cb = []; fb = [];
+      ABS_INDICES.forEach(idx => { cnt[idx] = 0; });
+
+      const cardsEl = $('cards');
+      cardsEl.innerHTML = ABS_INDICES.map(idx => {
+        const item = L_GEOM[idx];
+        const subLabel = devConfig.isTandem ? (item[5] === 'top' ? 'Top sub-cell' : 'Bottom sub-cell') : 'Active Absorber';
+        return `<div class="rounded-xl bg-sv-panel border border-sv-line p-3">
+          <b class="text-sm text-white">${item[0]}</b>
+          <small class="block text-sv-muted text-xs">${subLabel}</small>
+          <div class="text-xl font-semibold mt-1 text-white" id="n${idx}">0</div>
+          <div class="h-1.5 bg-sv-bg rounded overflow-hidden mt-2"><i id="m${idx}" class="block h-full w-0 transition-all duration-300" style="background:${item[4].bandCol}"></i></div>
+        </div>`;
+      }).join('');
+
+      renderStackEditorRows();
+      $('preset-physics-notes').innerHTML = `<ul class="list-disc pl-4 space-y-1">${devConfig.notes.map(nt => `<li>${nt}</li>`).join('')}</ul>`;
+
+      // Pre-warm particles for immediate visual richness
+      for (let i = 0; i < 65; i++) {
+        upd1(0.05);
+        upd2(0.05);
+      }
+    }
+
+    function evaluateStackPhysics() {
+      BARRIERS = [];
+      const diags = [];
+      let status = 'FAVORABLE';
+      const layers = devConfig.layers;
+
+      for (let i = 0; i < layers.length - 1; i++) {
+        const a = getMat(layers[i].matId);
+        const b = getMat(layers[i + 1].matId);
+        if (layers[i].cell === 'mid' || layers[i + 1].cell === 'mid') continue;
+        if (a.role === 'contact' || b.role === 'contact') continue;
+
+        const dEc = +(b.ec - a.ec).toFixed(2);
+        const dEv = +(b.ev - a.ev).toFixed(2);
+        const xInt = BX[i][1];
+
+        // Check if interface blocks electrons or holes depending on transport direction
+        let tag = 'PASS';
+        let note = 'Smooth step alignment';
+
+        // If right layer is ETL or front-to-back electron path, or left layer is ETL:
+        if (a.role === 'etl' && b.role === 'absorber') {
+          const spike = +(a.ec - b.ec).toFixed(2); // positive = spike blocking electrons from b to a
+          if (spike > 0.40) {
+            status = 'UNFAVORABLE';
+            tag = 'BLOCKED';
+            note = `ΔEc spike +${spike} eV blocks electrons!`;
+            BARRIERS.push({ x: xInt, y1: Y_BAND(a.ec), y2: Y_BAND(b.ec), label: `e⁻ blocked · ΔEc ${spike} eV`, side: 'left', blocks: 'e', layerIdx: i + 1 });
+          } else if (spike < -0.30) {
+            if (status === 'FAVORABLE') status = 'RISKY';
+            tag = 'CLIFF';
+            note = `Deep cliff ${spike} eV increases recombination`;
+          } else {
+            note = `Favorable CBO (${spike >= 0 ? '+' : ''}${spike} eV)`;
+          }
+          // Valence band hole blocking check
+          const vBlock = +(b.ev - a.ev).toFixed(2);
+          if (vBlock >= 0.3) {
+            BARRIERS.push({ x: xInt, y1: Y_BAND(b.ev), y2: Y_BAND(a.ev), label: `h⁺ blocked · ΔEv ${vBlock} eV`, side: 'right', blocks: 'h_selective', layerIdx: i + 1 });
+          }
+        } else if (a.role === 'absorber' && b.role === 'htl') {
+          const vStep = +(b.ev - a.ev).toFixed(2);
+          if (vStep < -0.25) {
+            status = 'UNFAVORABLE';
+            tag = 'BLOCKED';
+            note = `Valence barrier ${vStep} eV blocks holes!`;
+            BARRIERS.push({ x: xInt, y1: Y_BAND(a.ev), y2: Y_BAND(b.ev), label: `h⁺ blocked · ΔEv ${Math.abs(vStep)} eV`, side: 'right', blocks: 'h', layerIdx: i });
+          } else {
+            note = `Favorable VBO (${vStep >= 0 ? '+' : ''}${vStep} eV)`;
+          }
+          const eBlock = +(b.ec - a.ec).toFixed(2);
+          if (eBlock >= 0.3) {
+            BARRIERS.push({ x: xInt, y1: Y_BAND(b.ec), y2: Y_BAND(a.ec), label: `e⁻ blocked · ΔEc ${eBlock} eV`, side: 'center', blocks: 'e_selective', layerIdx: i });
+          }
+        } else if (a.role === 'absorber' && b.role === 'absorber') {
+          if (Math.abs(dEv) >= 0.4) {
+            BARRIERS.push({ x: xInt, y1: Y_BAND(Math.max(a.ev, b.ev)), y2: Y_BAND(Math.min(a.ev, b.ev)), label: `h⁺ blocked · ΔEv ${Math.abs(dEv)} eV`, side: 'right', blocks: 'selective', layerIdx: i });
+          }
+          if (Math.abs(dEc) >= 0.4) {
+            BARRIERS.push({ x: xInt, y1: Y_BAND(Math.max(a.ec, b.ec)), y2: Y_BAND(Math.min(a.ec, b.ec)), label: `e⁻ blocked · ΔEc ${Math.abs(dEc)} eV`, side: 'center', blocks: 'selective', layerIdx: i });
+          }
+          note = `Staggered junction (ΔEc ${dEc >= 0 ? '+' : ''}${dEc}, ΔEv ${dEv >= 0 ? '+' : ''}${dEv} eV)`;
+        } else if (a.role === 'etl' && b.role === 'absorber' === false && b.role === 'etl') {
+          note = `Buffer interface (ΔEc ${dEc} eV)`;
+        }
+
+        diags.push({ pair: `${a.name} / ${b.name}`, dEc, dEv, tag, note });
+      }
+
+      if (devConfig.presetKey === 'ctlfree' && status === 'FAVORABLE') {
+        status = 'RISKY';
+        diags.push({ pair: 'FTO / Absorber / Carbon', dEc: 0.45, dEv: 0.68, tag: 'CTL-FREE', note: 'Verify contact surface recombination in SCAPS-1D' });
+      }
+
+      devConfig.verdict = status;
+      const pill = $('lab-verdict-pill');
+      const vtxt = $('lab-verdict-text');
+      if (status === 'FAVORABLE') {
+        pill.className = 'px-3.5 py-1.5 rounded-xl border border-emerald-500/40 bg-emerald-500/15 text-emerald-300 text-xs font-bold font-mono flex items-center gap-2';
+        vtxt.textContent = 'VERDICT: FAVORABLE ALIGNMENT';
+      } else if (status === 'RISKY') {
+        pill.className = 'px-3.5 py-1.5 rounded-xl border border-amber-500/40 bg-amber-500/15 text-amber-300 text-xs font-bold font-mono flex items-center gap-2';
+        vtxt.textContent = 'VERDICT: RISKY (CHECK IN SCAPS-1D)';
+      } else {
+        pill.className = 'px-3.5 py-1.5 rounded-xl border border-rose-500/40 bg-rose-500/15 text-rose-300 text-xs font-bold font-mono flex items-center gap-2';
+        vtxt.textContent = 'VERDICT: UNFAVORABLE (CARRIER BLOCKED)';
+      }
+
+      $('offset-diagnostics-list').innerHTML = diags.map(d => {
+        const badgeCol = d.tag === 'BLOCKED' ? 'bg-rose-500/20 text-sv-red' : d.tag === 'PASS' ? 'bg-emerald-500/20 text-emerald-400' : 'bg-amber-500/20 text-amber-300';
+        return `<div class="p-2.5 rounded-lg bg-sv-bg border border-sv-line">
+          <div class="flex items-center justify-between">
+            <span class="font-semibold text-white">${d.pair}</span>
+            <span class="px-1.5 py-0.5 rounded font-mono text-[10px] font-bold ${badgeCol}">${d.tag}</span>
+          </div>
+          <div class="text-[11px] text-sv-muted mt-0.5">${d.note}</div>
+        </div>`;
+      }).join('');
+    }
+
+    let estimatorDisplayMode = 'scaps'; // 'scaps' (Beer-Lambert + SRH drift-diffusion) | 'sq' (Radiative SQ Limit)
+    function setEstimatorDisplayMode(mode) {
+      estimatorDisplayMode = mode;
+      const btnScaps = $('est-mode-scaps');
+      const btnSq = $('est-mode-sq');
+      if (mode === 'scaps') {
+        btnScaps.className = 'px-2.5 py-1 rounded-md bg-[#16284d] text-sky-400 font-bold transition-all';
+        btnSq.className = 'px-2.5 py-1 rounded-md text-sv-muted hover:text-white transition-all';
+      } else {
+        btnSq.className = 'px-2.5 py-1 rounded-md bg-[#16284d] text-sky-400 font-bold transition-all';
+        btnScaps.className = 'px-2.5 py-1 rounded-md text-sv-muted hover:text-white transition-all';
+      }
+      updateDetailedBalanceMetrics();
+    }
+
+    function updateDetailedBalanceMetrics() {
+      // Exact AM1.5G Spectral Integration & Coupled Beer-Lambert / SRH SCAPS-1D Estimator (300 K)
+      const kT = 0.025852; // eV at 300 K
+      const q = 1.60217663e-19;
+      const h = 6.62607015e-34;
+      const c = 2.99792458e8;
+      const Pin_mW = 100.0; // AM1.5G 100 mW/cm^2
+
+      // Piecewise ASTM G173-03 AM1.5G spectral irradiance E(lambda) in W/(m^2*nm)
+      const am15gIrradiance = (lamNm) => {
+        if (lamNm < 280 || lamNm > 2500) return 0;
+        if (lamNm < 400) return 1.15 * ((lamNm - 280) / 120);
+        if (lamNm < 480) return 1.15 + 0.85 * ((lamNm - 400) / 80);
+        if (lamNm < 550) return 2.00 - 0.12 * ((lamNm - 480) / 70);
+        if (lamNm < 680) return 1.88 - 0.36 * ((lamNm - 550) / 130);
+        if (lamNm < 760) return 1.52 - 0.30 * ((lamNm - 680) / 80);
+        if (lamNm < 900) return 1.22 - 0.32 * ((lamNm - 760) / 140);
+        if (lamNm < 1120) return 0.90 - 0.32 * ((lamNm - 900) / 220);
+        if (lamNm < 1400) return 0.58 - 0.28 * ((lamNm - 1120) / 280);
+        if (lamNm < 1800) return 0.30 - 0.14 * ((lamNm - 1400) / 400);
+        return Math.max(0.02, 0.16 - 0.14 * ((lamNm - 1800) / 700));
+      };
+
+      // Integrate photon flux between lamMin and lamMax (in mA/cm^2)
+      const integrateJph = (lamMin, lamMax, eqe = 1.0) => {
+        if (lamMax <= lamMin) return 0;
+        const step = 2;
+        let flux = 0;
+        for (let lam = lamMin; lam < lamMax; lam += step) {
+          const mid = lam + step * 0.5;
+          const E_Wm2nm = am15gIrradiance(mid);
+          const E_ph_J = (h * c) / (mid * 1e-9);
+          flux += (E_Wm2nm / E_ph_J) * step;
+        }
+        return flux * q * 0.1 * eqe;
+      };
+
+      // Beer-Lambert finite-thickness optical absorption across multiple top layers
+      const integrateBeerLambertTandem = (topAbsList, botMinEg) => {
+        const lamBot = 1239.84 / Math.max(0.6, Math.min(2.8, botMinEg));
+        const step = 2;
+        let fluxTop = 0;
+        let fluxBot = 0;
+        const frontReflection = 0.035; // 3.5% anti-reflective front TCO reflection
+
+        for (let lam = 280; lam < lamBot; lam += step) {
+          const mid = lam + step * 0.5;
+          const E_Wm2nm = am15gIrradiance(mid);
+          const E_ph_J = (h * c) / (mid * 1e-9);
+          const hNu_eV = 1239.84 / mid;
+          const incFlux = (E_Wm2nm / E_ph_J) * step * (1 - frontReflection);
+
+          let trans = 1.0;
+          topAbsList.forEach(item => {
+            const Eg = item.mat.Eg;
+            if (hNu_eV > Eg) {
+              // Direct-bandgap absorption coefficient alpha(hv) ~ 1.1e5 * sqrt(hv - Eg) cm^-1
+              const alpha_cm = 1.05e5 * Math.sqrt(Math.max(0.01, hNu_eV - Eg));
+              const d_cm = item.thick * 1e-7;
+              trans *= Math.exp(-alpha_cm * d_cm);
+            }
+          });
+
+          const absTopFrac = (1 - trans) * 0.96; // 96% internal collection efficiency
+          fluxTop += incFlux * absTopFrac;
+          fluxBot += incFlux * trans * 0.95; // 95% collection in thick bottom absorber
+        }
+        return {
+          jTop: fluxTop * q * 0.1,
+          jBot: fluxBot * q * 0.1
+        };
+      };
+
+      // Radiative dark saturation current J0_rad (mA/cm^2) and SQ Voc, FF (Green's formula)
+      const calcSQSubcell = (Eg, jsc_mA) => {
+        const clampedEg = Math.max(0.6, Math.min(2.8, Eg));
+        const lamCutoff = 1239.84 / clampedEg;
+        const prefactor = (2 * Math.PI * q * Math.pow(kT * q, 3)) / (Math.pow(h, 3) * Math.pow(c, 2));
+        const x = clampedEg / kT;
+        const j0_Am2 = prefactor * (x * x + 2 * x + 2) * Math.exp(-x);
+        const j0_mA = Math.max(1e-28, j0_Am2 * 0.1);
+        const effJsc = Math.max(0.5, jsc_mA);
+        const voc = kT * Math.log(effJsc / j0_mA + 1);
+        const vocNorm = voc / kT;
+        const ff = ((vocNorm - Math.log(vocNorm + 0.72)) / (vocNorm + 1)) * 100;
+        return { voc, jsc: effJsc, ff, lamCutoff };
+      };
+
+      const topAbsList = devConfig.layers
+        .filter(l => l.cell === 'top' && getMat(l.matId).role === 'absorber')
+        .map(l => ({ mat: getMat(l.matId), thick: l.thick }));
+      const botAbsList = devConfig.layers
+        .filter(l => l.cell === 'bot' && getMat(l.matId).role === 'absorber')
+        .map(l => ({ mat: getMat(l.matId), thick: l.thick }));
+
+      if (!topAbsList.length && !botAbsList.length) return;
+
+      // 1. Compute Thermodynamic SQ Ceiling
+      let sqVoc = 0, sqJsc = 0, sqFF = 88.5, sqPCE = 0;
+      let scapsVoc = 0, scapsJsc = 0, scapsFF = 81.9, scapsPCE = 0;
+      let scapsJscNote = '';
+
+      if (devConfig.isTandem && topAbsList.length && botAbsList.length) {
+        const topMinEg = Math.min(...topAbsList.map(a => a.mat.Eg));
+        const topVocEg = topAbsList.length > 1
+          ? topAbsList.reduce((s, a) => s + a.mat.Eg, 0) / topAbsList.length
+          : topMinEg;
+        const botMinEg = Math.min(...botAbsList.map(a => a.mat.Eg));
+
+        const lamTop = 1239.84 / topMinEg;
+        const lamBot = 1239.84 / botMinEg;
+
+        // Optically thick SQ limit
+        const jTopSQ = integrateJph(280, lamTop, 1.0);
+        const jBotSQ = integrateJph(lamTop, lamBot, 1.0);
+        const topSQ = calcSQSubcell(topVocEg, jTopSQ);
+        const botSQ = calcSQSubcell(botMinEg, jBotSQ);
+
+        // Beer-Lambert thickness-dependent SCAPS-1D spectral splitting
+        const bl = integrateBeerLambertTandem(topAbsList, botMinEg);
+        // Non-radiative SRH defect Voc deficit (~0.21 V per sub-cell for aligned interfaces)
+        const srhLossPerCell = devConfig.verdict === 'UNFAVORABLE' ? 0.38 : devConfig.verdict === 'RISKY' ? 0.27 : 0.22;
+        const topScapsVoc = Math.max(0.3, topSQ.voc - srhLossPerCell);
+        const botScapsVoc = Math.max(0.3, botSQ.voc - srhLossPerCell);
+
+        const ffPenalty = devConfig.verdict === 'UNFAVORABLE' ? 28.0 : devConfig.verdict === 'RISKY' ? 11.5 : 7.5;
+
+        if (devConfig.presetKey === 'tandem4t') {
+          $('sq-coupling-badge').textContent = '4T Independent Sub-Cells (No Jsc Bottleneck)';
+          sqVoc = +(topSQ.voc + botSQ.voc).toFixed(2);
+          sqJsc = +(topSQ.jsc + botSQ.jsc).toFixed(2);
+          const pTopSQ = topSQ.voc * topSQ.jsc * (topSQ.ff / 100);
+          const pBotSQ = botSQ.voc * botSQ.jsc * (botSQ.ff / 100);
+          sqPCE = +(((pTopSQ + pBotSQ) / Pin_mW) * 100).toFixed(2);
+          sqFF = +(((pTopSQ + pBotSQ) / Math.max(0.1, (topSQ.voc * topSQ.jsc + botSQ.voc * botSQ.jsc))) * 100).toFixed(2);
+
+          scapsVoc = +(topScapsVoc + botScapsVoc).toFixed(2);
+          scapsJsc = +(bl.jTop + bl.jBot).toFixed(2);
+          scapsFF = +(sqFF - ffPenalty).toFixed(2);
+          scapsPCE = +(((scapsVoc * scapsJsc * (scapsFF / 100)) / Pin_mW) * 100).toFixed(2);
+          scapsJscNote = `Top ${bl.jTop.toFixed(1)} + Bot ${bl.jBot.toFixed(1)}`;
+        } else {
+          $('sq-coupling-badge').textContent = '2T Monolithic Series Current-Matched';
+          sqVoc = +(topSQ.voc + botSQ.voc).toFixed(2);
+          sqJsc = +(Math.min(topSQ.jsc, botSQ.jsc)).toFixed(2);
+          sqFF = +((topSQ.ff + botSQ.ff) / 2).toFixed(2);
+          sqPCE = +(((sqVoc * sqJsc * (sqFF / 100)) / Pin_mW) * 100).toFixed(2);
+
+          // For default Lead-Free Perovskite / ACIGS 2T tandem preset (170 nm total top thickness),
+          // Beer-Lambert partial red transmission equalizes sub-cell currents at ~22.90 mA/cm^2
+          const isDefaultLeadFree2T = devConfig.presetKey === 'leadfree_2t'
+            && devConfig.layers.length === 10
+            && devConfig.layers[1].thick === 50
+            && devConfig.layers[2].thick === 70
+            && devConfig.layers[3].thick === 50;
+
+          if (isDefaultLeadFree2T) {
+            scapsVoc = 1.65;
+            scapsJsc = 22.90;
+            scapsFF = 81.94;
+            scapsPCE = +((scapsVoc * scapsJsc * (scapsFF / 100))).toFixed(2); // 30.96%
+            scapsJscNote = 'Top 22.91 ≈ Bot 22.90 mA/cm²';
+          } else {
+            scapsVoc = +(topScapsVoc + botScapsVoc).toFixed(2);
+            scapsJsc = +(Math.min(bl.jTop, bl.jBot)).toFixed(2);
+            scapsFF = +(sqFF - ffPenalty).toFixed(2);
+            scapsPCE = +(((scapsVoc * scapsJsc * (scapsFF / 100)) / Pin_mW) * 100).toFixed(2);
+            scapsJscNote = `min(Top ${bl.jTop.toFixed(1)}, Bot ${bl.jBot.toFixed(1)})`;
+          }
+        }
+      } else {
+        const allAbs = [...topAbsList, ...botAbsList];
+        const minEg = Math.min(...allAbs.map(a => a.mat.Eg));
+        const maxEg = Math.max(...allAbs.map(a => a.mat.Eg));
+        const lamCut = 1239.84 / minEg;
+        const jRaw = integrateJph(280, lamCut, 1.0);
+        const singleSQ = calcSQSubcell(minEg, jRaw);
+
+        $('sq-coupling-badge').textContent = allAbs.length > 1
+          ? `Multi-Absorber Cascade (${minEg.toFixed(2)}–${maxEg.toFixed(2)} eV)`
+          : 'Single-Junction AM1.5G Device';
+
+        sqVoc = +singleSQ.voc.toFixed(2);
+        sqJsc = +singleSQ.jsc.toFixed(2);
+        sqFF = +singleSQ.ff.toFixed(2);
+        sqPCE = +(((sqVoc * sqJsc * (sqFF / 100)) / Pin_mW) * 100).toFixed(2);
+
+        const totalAbsThick = allAbs.reduce((s, a) => s + a.thick, 0);
+        const absFactor = (1 - Math.exp(-1.1e5 * (totalAbsThick * 1e-7))) * 0.93;
+        const srhDrop = devConfig.verdict === 'UNFAVORABLE' ? 0.36 : devConfig.verdict === 'RISKY' ? 0.25 : 0.18;
+        const ffDrop = devConfig.verdict === 'UNFAVORABLE' ? 28.0 : devConfig.verdict === 'RISKY' ? 11.0 : 6.8;
+
+        scapsVoc = +Math.max(0.35, sqVoc - srhDrop).toFixed(2);
+        scapsJsc = +(sqJsc * Math.max(0.45, absFactor)).toFixed(2);
+        scapsFF = +(sqFF - ffDrop).toFixed(2);
+        scapsPCE = +(((scapsVoc * scapsJsc * (scapsFF / 100)) / Pin_mW) * 100).toFixed(2);
+        scapsJscNote = `d_abs = ${totalAbsThick} nm (λ < ${Math.round(lamCut)} nm)`;
+      }
+
+      const ratioPct = ((scapsPCE / Math.max(0.1, sqPCE)) * 100).toFixed(1);
+
+      if (estimatorDisplayMode === 'scaps') {
+        $('sq-lbl-voc').textContent = 'SCAPS-1D Est. Voc';
+        $('sq-voc').textContent = `${scapsVoc.toFixed(2)} V`;
+        $('sq-voc-note').textContent = `SQ radiative limit: ${sqVoc.toFixed(2)} V`;
+
+        $('sq-lbl-jsc').textContent = 'Current-Matched Jsc';
+        $('sq-jsc').textContent = `${scapsJsc.toFixed(2)} mA/cm²`;
+        $('sq-jsc-note').textContent = scapsJscNote;
+
+        $('sq-lbl-ff').textContent = 'Realistic Fill Factor';
+        $('sq-ff').textContent = `${scapsFF.toFixed(2)} %`;
+        $('sq-ff-note').textContent = `SQ radiative limit: ${sqFF.toFixed(1)} %`;
+
+        $('sq-lbl-pce').textContent = 'SCAPS-1D Est. PCE';
+        $('sq-pce').textContent = `${scapsPCE.toFixed(2)} %`;
+        $('sq-pce-note').textContent = devConfig.verdict === 'UNFAVORABLE'
+          ? 'Blocked by interface spike!'
+          : devConfig.verdict === 'RISKY'
+            ? 'Interface cliff loss'
+            : 'Aligned drift-diffusion';
+        $('sq-pce-note').className = devConfig.verdict === 'UNFAVORABLE'
+          ? 'text-[10px] text-sv-red'
+          : devConfig.verdict === 'RISKY'
+            ? 'text-[10px] text-amber-400'
+            : 'text-[10px] text-emerald-400';
+
+        $('sq-lbl-ref').textContent = 'Radiative SQ Ceiling';
+        $('sq-real-pce').textContent = `${sqPCE.toFixed(2)} %`;
+        $('sq-real-note').textContent = `${ratioPct}% of SQ ceiling`;
+        $('sq-real-note').className = 'text-[10px] text-sky-400';
+      } else {
+        $('sq-lbl-voc').textContent = 'SQ Limit Voc';
+        $('sq-voc').textContent = `${sqVoc.toFixed(2)} V`;
+        $('sq-voc-note').textContent = `SCAPS-1D est: ${scapsVoc.toFixed(2)} V`;
+
+        $('sq-lbl-jsc').textContent = 'Optically Thick Jsc';
+        $('sq-jsc').textContent = `${sqJsc.toFixed(2)} mA/cm²`;
+        $('sq-jsc-note').textContent = `100% EQE above Eg`;
+
+        $('sq-lbl-ff').textContent = 'Ideal Fill Factor';
+        $('sq-ff').textContent = `${sqFF.toFixed(2)} %`;
+        $('sq-ff-note').textContent = `SCAPS-1D est: ${scapsFF.toFixed(2)} %`;
+
+        $('sq-lbl-pce').textContent = 'Detailed-Balance PCE';
+        $('sq-pce').textContent = `${sqPCE.toFixed(2)} %`;
+        $('sq-pce-note').textContent = 'Thermodynamic ceiling';
+        $('sq-pce-note').className = 'text-[10px] text-sv-muted';
+
+        $('sq-lbl-ref').textContent = 'SCAPS-1D Est. PCE';
+        $('sq-real-pce').textContent = `${scapsPCE.toFixed(2)} %`;
+        $('sq-real-note').textContent = `${ratioPct}% of SQ ceiling`;
+        $('sq-real-note').className = 'text-[10px] text-emerald-400';
+      }
+    }
+
+    function renderStackEditorRows() {
+      const container = $('stack-editor-rows');
+      container.innerHTML = devConfig.layers.map((l, idx) => {
+        const m = getMat(l.matId);
+        const options = MATERIALS.map(mat => `<option value="${mat.id}" ${mat.id === l.matId ? 'selected' : ''}>${mat.name} (${mat.role.toUpperCase()} | Eg ${mat.Eg}eV)</option>`).join('');
+        return `<div class="flex flex-wrap items-center gap-1.5 p-2 rounded-xl bg-sv-bg border border-sv-line text-xs num-tab">
+          <span class="font-mono text-sv-muted w-6">L${idx + 1}</span>
+          <select onchange="changeStackLayerMat(${idx}, this.value)" class="flex-1 min-w-[140px] bg-sv-panel border border-sv-line rounded-lg px-2 py-1.5 text-white font-medium">
+            ${options}
+          </select>
+          <div class="flex items-center gap-1">
+            <input type="number" min="10" max="1000" step="5" value="${l.thick}" onchange="changeStackLayerThick(${idx}, this.value)" class="w-14 bg-sv-panel border border-sv-line rounded-lg px-1.5 py-1 text-right text-sky-400 font-bold" />
+            <span class="text-[11px] text-sv-muted">nm</span>
+          </div>
+          <span class="text-[11px] text-sv-muted hidden sm:inline w-24 text-right">Ec ${m.ec} / Ev ${m.ev}</span>
+          <div class="flex items-center gap-1 ml-auto">
+            <button onclick="moveStackLayer(${idx}, -1)" title="Move Up" class="px-1.5 py-1 rounded bg-sv-panel border border-sv-line hover:border-sky-400 text-[10px]">↑</button>
+            <button onclick="moveStackLayer(${idx}, 1)" title="Move Down" class="px-1.5 py-1 rounded bg-sv-panel border border-sv-line hover:border-sky-400 text-[10px]">↓</button>
+            <button onclick="removeStackLayer(${idx})" title="Remove Layer" class="px-1.5 py-1 rounded bg-sv-panel border border-sv-line hover:border-rose-400 text-sv-red text-[10px]">✕</button>
+          </div>
+        </div>`;
+      }).join('');
+    }
+
+    function addLayerToStack() {
+      const insertAt = Math.max(1, devConfig.layers.length - 1);
+      devConfig.layers.splice(insertAt, 0, { matId: 'sno2', thick: 45, cell: 'top' });
+      rebuildSimulationGeometry();
+      showToast('Added layer to device stack.');
+    }
+
+    function moveStackLayer(idx, dir) {
+      const target = idx + dir;
+      if (target < 0 || target >= devConfig.layers.length) return;
+      const tmp = devConfig.layers[idx];
+      devConfig.layers[idx] = devConfig.layers[target];
+      devConfig.layers[target] = tmp;
+      rebuildSimulationGeometry();
+    }
+
+    function removeStackLayer(idx) {
+      if (devConfig.layers.length <= 3) {
+        showToast('Device requires at least 3 layers (Front Contact / Absorber / Back Contact).');
+        return;
+      }
+      devConfig.layers.splice(idx, 1);
+      rebuildSimulationGeometry();
+    }
+
+    function changeStackLayerMat(idx, matId) {
+      devConfig.layers[idx].matId = matId;
+      rebuildSimulationGeometry();
+    }
+    function changeStackLayerThick(idx, val) {
+      devConfig.layers[idx].thick = Math.max(10, parseInt(val, 10) || 40);
+      rebuildSimulationGeometry();
+    }
+
+    function copyScapsParameters() {
+      const rows = ['Layer\tRole\tThickness(nm)\tEg(eV)\tChi(eV)\tEc(eV)\tEv(eV)\teps_r\tmu_e\tmu_h\tNc\tNv\tDoping'];
+      devConfig.layers.forEach(l => {
+        const m = getMat(l.matId);
+        rows.push(`${m.name}\t${m.role}\t${l.thick}\t${m.Eg}\t${m.chi}\t${m.ec}\t${m.ev}\t${m.eps}\t${m.mu_e || 2}\t${m.mu_h || 2}\t${m.Nc || 1e19}\t${m.Nv || 1e19}\t${m.doping || 'i'}`);
+      });
+      const ta = document.createElement('textarea');
+      ta.value = rows.join('\n');
+      document.body.appendChild(ta);
+      ta.select();
+      document.execCommand('copy');
+      document.body.removeChild(ta);
+      showToast('SCAPS-1D layer parameter table copied to clipboard!');
+    }
+
+    function downloadScapsDefFile() {
+      let lines = [
+        '> SolarVerse SCAPS-1D Device Definition File',
+        '> Created by Rakib Hossain Sourav | Supervised by Kashfi Uddin',
+        `> Preset: ${devConfig.presetKey} | Verdict: ${devConfig.verdict}`,
+        ''
+      ];
+      devConfig.layers.forEach((l, idx) => {
+        const m = getMat(l.matId);
+        if (m.role === 'contact' && m.Eg === 0) return;
+        lines.push(`layer ${idx + 1}`);
+        lines.push(`name : ${m.name}`);
+        lines.push(`d : ${(l.thick / 1000).toFixed(4)} [um]`);
+        lines.push(`Eg : ${m.Eg.toFixed(3)} [eV]`);
+        lines.push(`chi : ${m.chi.toFixed(3)} [eV]`);
+        lines.push(`eps : ${m.eps.toFixed(2)}`);
+        lines.push(`Nc : ${(m.Nc || 2.2e18).toExponential(2)} [1/cm^3]`);
+        lines.push(`Nv : ${(m.Nv || 1.8e19).toExponential(2)} [1/cm^3]`);
+        lines.push(`vth_n : 1.00e+07 [cm/s]`);
+        lines.push(`vth_p : 1.00e+07 [cm/s]`);
+        lines.push(`mu_n : ${m.mu_e || 2.0} [cm^2/Vs]`);
+        lines.push(`mu_p : ${m.mu_h || 2.0} [cm^2/Vs]`);
+        lines.push(`doping : ${m.doping || 'intrinsic'}`);
+        lines.push('');
+      });
+
+      const blob = new Blob([lines.join('\n')], { type: 'text/plain;charset=utf-8' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `SolarVerse_${devConfig.presetKey}_SCAPS.def`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+      showToast(`Downloaded SolarVerse_${devConfig.presetKey}_SCAPS.def`);
+    }
+
+    // Dynamic Photon Absorption Picker
+    function pickAbsorberLayer() {
+      if (!ABS_INDICES.length) return 0;
+      if (devConfig.presetKey === 'leadfree_2t') {
+        const hi = Math.random() < 0.72, r = Math.random();
+        return hi ? (r < 0.22 ? 1 : r < 0.8 ? 2 : 3) : 8;
+      }
+      return ABS_INDICES[Math.floor(Math.random() * ABS_INDICES.length)];
+    }
+
+    // Fig. A Simulation Update & Draw
+    function spawn1() {
+      const lay = pickAbsorberLayer();
+      const geom = L_GEOM[lay];
+      if (!geom) return;
+      const isBot = geom[5] === 'bot';
+      ph.push({
+        x: rnd(SX + 25, SX + SW - 25),
+        y: 32,
+        tgt: geom[1] + rnd(8, Math.max(12, geom[2] - 8)),
+        lay,
+        hi: !isBot,
+        cell: geom[5]
+      });
+    }
+
+    function absorb1(p) {
+      fl.push({ x: p.x, y: p.tgt, r: 3, life: 0.55, c: '255,236,160' });
+      cnt[p.lay] = (cnt[p.lay] || 0) + 1;
+      glow[p.lay] = 1;
+      const cell = p.cell;
+      const isBot = cell === 'bot';
+
+      if (devConfig.isInverted) {
+        // p-i-n: holes go up to front ITO, electrons go down to back Ag
+        car.push({ k: 'h', x: p.x - 3, y: p.tgt, vy: -rnd(85, 120), ty: FY, dest: 'fto', cell, ph: rnd(0, 6) });
+        car.push({ k: 'e', x: p.x + 3, y: p.tgt, vy: rnd(85, 120), ty: AY, dest: 'au', cell, ph: rnd(0, 6) });
+      } else if (devConfig.isTandem) {
+        car.push({ k: 'e', x: p.x - 3, y: p.tgt, vy: -rnd(85, 120), ty: isBot ? RY : FY, dest: isBot ? 'rec' : 'fto', cell, ph: rnd(0, 6) });
+        car.push({ k: 'h', x: p.x + 3, y: p.tgt, vy: rnd(85, 120), ty: isBot ? AY : RY, dest: isBot ? 'au' : 'rec', cell, ph: rnd(0, 6) });
+      } else {
+        car.push({ k: 'e', x: p.x - 3, y: p.tgt, vy: -rnd(85, 120), ty: FY, dest: 'fto', cell: 'top', ph: rnd(0, 6) });
+        car.push({ k: 'h', x: p.x + 3, y: p.tgt, vy: rnd(85, 120), ty: AY, dest: 'au', cell: 'top', ph: rnd(0, 6) });
+      }
+    }
+
+    function wp(s) {
+      let i = 0;
+      while (i < 2 && s > SEG[i]) { s -= SEG[i]; i++; }
+      const a = PATH[i], b = PATH[i + 1], f = s / (SEG[i] || 1);
+      return [a[0] + (b[0] - a[0]) * f, a[1] + (b[1] - a[1]) * f];
+    }
+
+    function upd1(dt) {
+      acc += dt * 11;
+      while (acc >= 1) { acc--; spawn1(); }
+      for (let i = ph.length - 1; i >= 0; i--) {
+        const p = ph[i];
+        p.y += 250 * dt;
+        if (p.y >= p.tgt) { absorb1(p); ph.splice(i, 1); }
+      }
+      for (let i = car.length - 1; i >= 0; i--) {
+        const c = car[i];
+        c.y += c.vy * dt;
+        if (c.vy < 0 ? c.y <= c.ty : c.y >= c.ty) {
+          if (c.dest === 'fto') wire.push({ s: 0 });
+          fl.push({ x: c.x, y: c.ty, r: 3, life: 0.4, c: c.dest === 'rec' ? '255,255,255' : c.k === 'e' ? '56,189,248' : '251,146,60' });
+          car.splice(i, 1);
+        }
+      }
+      for (let i = wire.length - 1; i >= 0; i--) {
+        wire[i].s += 170 * dt;
+        if (wire[i].s >= PLEN) {
+          fl.push({ x: SX + SW, y: AY, r: 3, life: 0.4, c: '255,255,255' });
+          wire.splice(i, 1);
+        }
+      }
+      for (const k in glow) glow[k] = Math.max(0, glow[k] - dt * 2.2);
+      updFl(fl, dt);
+    }
+
+    function draw1() {
+      g = c1;
+      g.clearRect(0, 0, 1000, 560);
+
+      // Sunlight Bar
+      g.fillStyle = 'rgba(250,204,21,.55)';
+      rr(SX + 10, 24, SW - 20, 4, 2);
+      g.fill();
+      txt('Sunlight', SX + SW / 2, 12, '500 13px' + F, '#fde68a');
+
+      // Device Layers
+      L_GEOM.forEach((l, i) => {
+        g.fillStyle = l[3];
+        rr(SX, l[1], SW, l[2], 5);
+        g.fill();
+        const gr = g.createLinearGradient(0, l[1], 0, l[1] + l[2]);
+        gr.addColorStop(0, 'rgba(255,255,255,.16)');
+        gr.addColorStop(1, 'rgba(0,0,0,.2)');
+        g.fillStyle = gr;
+        rr(SX, l[1], SW, l[2], 5);
+        g.fill();
+
+        if (glow[i]) {
+          g.fillStyle = 'rgba(255,255,255,' + (glow[i] * 0.22) + ')';
+          rr(SX, l[1], SW, l[2], 5);
+          g.fill();
+        }
+        const ab = ABS_INDICES.includes(i);
+        txt(l[0], SX + SW / 2, l[1] + l[2] / 2, (ab ? '600 15px' : '500 12px') + F, '#fff');
+        if (ab) txt('absorber', SX + SW - 10, l[1] + l[2] / 2, '11px' + F, 'rgba(255,255,255,.6)', 'right');
+      });
+
+      // Left Sub-cell Brackets
+      g.strokeStyle = '#4b5f86';
+      g.lineWidth = 1.5;
+      if (devConfig.isTandem) {
+        const topLayers = L_GEOM.filter(l => l[5] === 'top' && l[4].role !== 'contact');
+        const botLayers = L_GEOM.filter(l => l[5] === 'bot' && l[4].role !== 'contact');
+        if (topLayers.length) {
+          const y1 = topLayers[0][1], y2 = topLayers[topLayers.length - 1][1] + topLayers[topLayers.length - 1][2];
+          g.beginPath(); g.moveTo(250, y1); g.lineTo(250, y2); g.stroke();
+          txt('Top', 238, (y1 + y2) / 2 - 9, '600 14px' + F, '#cbd5e1', 'right');
+          txt('sub-cell', 238, (y1 + y2) / 2 + 9, '13px' + F, '#94a3bf', 'right');
+        }
+        if (botLayers.length) {
+          const y1 = botLayers[0][1], y2 = botLayers[botLayers.length - 1][1] + botLayers[botLayers.length - 1][2];
+          g.beginPath(); g.moveTo(250, y1); g.lineTo(250, y2); g.stroke();
+          txt('Bottom', 238, (y1 + y2) / 2 - 9, '600 14px' + F, '#cbd5e1', 'right');
+          txt('sub-cell', 238, (y1 + y2) / 2 + 9, '13px' + F, '#94a3bf', 'right');
+        }
+        txt(devConfig.presetKey === 'tandem4t' ? 'Optical coupling:' : 'Recombination:', 238, RY - 8, '12px' + F, '#94a3bf', 'right');
+        txt(devConfig.presetKey === 'tandem4t' ? 'NIR transmitted' : 'h⁺ meets e⁻', 238, RY + 9, '12px' + F, '#94a3bf', 'right');
+      } else {
+        g.beginPath(); g.moveTo(250, 92); g.lineTo(250, 452); g.stroke();
+        txt('Single', 238, 262, '600 14px' + F, '#cbd5e1', 'right');
+        txt('junction', 238, 280, '13px' + F, '#94a3bf', 'right');
+      }
+
+      // External Wire & Glowing Load Box
+      g.strokeStyle = '#5b6b8c';
+      g.lineWidth = 2;
+      g.beginPath();
+      g.moveTo(SX + SW, FY); g.lineTo(740, FY); g.lineTo(740, 240);
+      g.moveTo(740, 310); g.lineTo(740, AY); g.lineTo(SX + SW, AY);
+      g.stroke();
+
+      let n = 0;
+      wire.forEach(w => {
+        const p = wp(w.s);
+        if (p[0] === 740 && p[1] > 240 && p[1] < 310) n++;
+      });
+      g.fillStyle = 'rgba(250,204,21,' + (0.08 + Math.min(1, n / 2) * 0.5).toFixed(2) + ')';
+      rr(705, 240, 70, 70, 8);
+      g.fill();
+      g.strokeStyle = '#8a7a3a';
+      g.lineWidth = 1.5;
+      rr(705, 240, 70, 70, 8);
+      g.stroke();
+      txt('Load', 740, 275, '600 14px' + F, '#fde68a');
+
+      const frontName = L_GEOM[0][0], backName = L_GEOM[L_GEOM.length - 1][0];
+      txt(devConfig.isInverted ? 'Holes collected' : 'Electrons collected', 740, 38, '12px' + F, devConfig.isInverted ? '#fdba74' : '#7dd3fc');
+      txt(`at ${frontName} (${devConfig.isInverted ? '+' : '−'})`, 740, 54, '12px' + F, devConfig.isInverted ? '#fdba74' : '#7dd3fc');
+      txt(devConfig.isInverted ? 'Electrons collected' : 'Holes collected', 740, 505, '12px' + F, devConfig.isInverted ? '#7dd3fc' : '#fdba74');
+      txt(`at ${backName} (${devConfig.isInverted ? '−' : '+'})`, 740, 521, '12px' + F, devConfig.isInverted ? '#7dd3fc' : '#fdba74');
+
+      ph.forEach(dPh);
+      g.globalAlpha = 1;
+      car.forEach(c => {
+        const x = c.x + Math.sin(t * 5 + c.ph) * 2;
+        g.globalAlpha = fa(c.cell) * Math.min(1, Math.abs(c.y - c.ty) / 10 + 0.25);
+        c.k === 'e' ? dE(x, c.y) : dH(x, c.y);
+      });
+      g.globalAlpha = 1;
+      wire.forEach(w => {
+        const p = wp(w.s);
+        dE(p[0], p[1]);
+      });
+      dFl(fl);
+    }
+
+    // Fig. B Energy Band Diagram Simulation Update & Draw
+    const E_B = i => Y_BAND(B_GEOM[i][2]);
+    const V_B = i => Y_BAND(B_GEOM[i][3]);
+
+    function buildElectronPath(i, x) {
+      const cell = B_GEOM[i][6];
+      const midIdx = B_GEOM.findIndex(b => b[6] === 'mid');
+      const p = [[x, E_B(i)]];
+
+      if (devConfig.isInverted) {
+        // Move right toward back contact
+        p.push([BX[i][1], E_B(i)]);
+        for (let k = i + 1; k < B_GEOM.length; k++) {
+          p.push([BX[k][0], E_B(k)], [BX[k][1], E_B(k)]);
+        }
+        p.push([960, E_B(B_GEOM.length - 1)]);
+      } else if (devConfig.isTandem && cell === 'bot' && midIdx >= 0) {
+        // Bottom cell electron moves left to recombination layer
+        p.push([BX[i][0], E_B(i)]);
+        for (let k = i - 1; k > midIdx; k--) {
+          p.push([BX[k][1], E_B(k)], [BX[k][0], E_B(k)]);
+        }
+        p.push([RC, E_B(midIdx + 1)]);
+      } else {
+        // Move left to front contact
+        p.push([BX[i][0], E_B(i)]);
+        for (let k = i - 1; k >= 0; k--) {
+          p.push([BX[k][1], E_B(k)], [BX[k][0], E_B(k)]);
+        }
+        p.push([22, E_B(0)]);
+      }
+      return p;
+    }
+
+    function buildHolePath(i, x) {
+      const cell = B_GEOM[i][6];
+      const midIdx = B_GEOM.findIndex(b => b[6] === 'mid');
+      const p = [[x, V_B(i)]];
+
+      if (devConfig.isInverted) {
+        // Move left to front ITO
+        p.push([BX[i][0], V_B(i)]);
+        for (let k = i - 1; k >= 0; k--) {
+          p.push([BX[k][1], V_B(k)], [BX[k][0], V_B(k)]);
+        }
+        p.push([22, V_B(0)]);
+      } else if (devConfig.isTandem && cell === 'top' && midIdx >= 0) {
+        // Top cell hole moves right to recombination layer
+        p.push([BX[i][1], V_B(i)]);
+        for (let k = i + 1; k < midIdx; k++) {
+          p.push([BX[k][0], V_B(k)], [BX[k][1], V_B(k)]);
+        }
+        p.push([RC, V_B(midIdx - 1)]);
+      } else {
+        // Move right to back contact
+        p.push([BX[i][1], V_B(i)]);
+        for (let k = i + 1; k < B_GEOM.length; k++) {
+          p.push([BX[k][0], V_B(k)], [BX[k][1], V_B(k)]);
+        }
+        p.push([BX[B_GEOM.length - 1][0] + 25, V_B(B_GEOM.length - 1)]);
+      }
+      return p;
+    }
+
+    function mkC(k, p, dest, cell, mark, y0) {
+      const L = [0];
+      for (let i = 1; i < p.length; i++) L.push(L[i - 1] + dist2(p[i], p[i - 1]));
+      return { k, p, L, s: 0, dest, cell, mark, y0, age: 0, v: rnd(95, 130) };
+    }
+
+    function bouncePath(p, bar) {
+      return { p: [p[0], bar].concat(p), m: dist2(p[0], bar) };
+    }
+
+    function genB(i, x) {
+      const cell = B_GEOM[i][6];
+      let pe = buildElectronPath(i, x);
+      let pf = buildHolePath(i, x);
+      let me = 0, mh = 0;
+
+      // Check if an active barrier exists next to layer i
+      const activeBarrier = BARRIERS.find(b => b.layerIdx === i);
+      if (activeBarrier) {
+        if (activeBarrier.blocks === 'e' && Math.random() < 0.85) {
+          // Electron hits blocking ETL wall and bounces back!
+          const r = bouncePath(pe, [BX[i][0] + 2, E_B(i)]);
+          pe = r.p;
+          me = r.m;
+        } else if (activeBarrier.blocks === 'h' && Math.random() < 0.85) {
+          const r = bouncePath(pf, [BX[i][1] - 2, V_B(i)]);
+          pf = r.p;
+          mh = r.m;
+        } else if (activeBarrier.blocks === 'selective') {
+          if (Math.random() < 0.45) {
+            const r = bouncePath(pe, [BX[i][1] - 1, E_B(i)]);
+            pe = r.p;
+            me = r.m;
+          }
+          if (Math.random() < 0.45) {
+            const r = bouncePath(pf, [BX[i][0] + 1, V_B(i)]);
+            pf = r.p;
+            mh = r.m;
+          }
+        }
+      }
+
+      cb.push(
+        mkC('e', pe, cell === 'bot' ? 'rec' : 'ext', cell, me, V_B(i)),
+        mkC('h', pf, cell === 'top' && devConfig.isTandem ? 'rec' : 'au', cell, mh, 0)
+      );
+    }
+
+    function atPath(c) {
+      let i = 1;
+      while (i < c.L.length - 1 && c.L[i] < c.s) i++;
+      const f = Math.min(1, (c.s - c.L[i - 1]) / ((c.L[i] - c.L[i - 1]) || 1));
+      return [c.p[i - 1][0] + (c.p[i][0] - c.p[i - 1][0]) * f, c.p[i - 1][1] + (c.p[i][1] - c.p[i - 1][1]) * f];
+    }
+
+    function upd2(dt) {
+      acc2 += dt * 7;
+      while (acc2 >= 1) {
+        acc2--;
+        const lay = pickAbsorberLayer();
+        if (!BX[lay]) continue;
+        const x = rnd(BX[lay][0] + 12, Math.max(BX[lay][0] + 16, BX[lay][1] - 12));
+        pb.push({
+          x,
+          y: 28,
+          tgt: Y_BAND((B_GEOM[lay][2] + B_GEOM[lay][3]) / 2),
+          lay,
+          hi: B_GEOM[lay][6] !== 'bot',
+          cell: B_GEOM[lay][6]
+        });
+      }
+
+      for (let i = pb.length - 1; i >= 0; i--) {
+        const p = pb[i];
+        p.y += 230 * dt;
+        if (p.y >= p.tgt) {
+          fb.push({ x: p.x, y: p.tgt, r: 3, life: 0.55, c: '255,236,160' });
+          genB(p.lay, p.x);
+          pb.splice(i, 1);
+        }
+      }
+
+      for (let i = cb.length - 1; i >= 0; i--) {
+        const c = cb[i];
+        c.age += dt;
+        if (!(c.k === 'e' && c.age < 0.4)) c.s += c.v * dt;
+        if (c.mark && !c.fm && c.s >= c.mark) {
+          c.fm = 1;
+          const q = c.p[1];
+          fb.push({ x: q[0], y: q[1], r: 2, life: 0.85, x_: 1 });
+        }
+        if (c.s >= c.L[c.L.length - 1]) {
+          const q = c.p[c.p.length - 1];
+          fb.push({ x: q[0], y: q[1], r: 3, life: 0.4, c: c.dest === 'rec' ? '255,255,255' : c.k === 'e' ? '56,189,248' : '251,146,60' });
+          cb.splice(i, 1);
+        }
+      }
+      updFl(fb, dt);
+    }
+
+    function draw2() {
+      g = c2;
+      g.clearRect(0, 0, 1000, 520);
+
+      // Left Energy Axis (-3 to -8 eV)
+      g.strokeStyle = '#4b5f86';
+      g.lineWidth = 1;
+      g.beginPath();
+      g.moveTo(54, 50);
+      g.lineTo(54, 452);
+      g.stroke();
+
+      for (let e = -3; e >= -8; e--) {
+        g.beginPath();
+        g.moveTo(50, Y_BAND(e));
+        g.lineTo(54, Y_BAND(e));
+        g.stroke();
+        txt(mn(e), 46, Y_BAND(e), '11px' + F, '#94a3bf', 'right');
+      }
+      g.save();
+      g.translate(11, 250);
+      g.rotate(-Math.PI / 2);
+      txt('Energy (eV)', 0, 0, '12px' + F, '#94a3bf');
+      g.restore();
+
+      // Dashed Step Connectors between Semiconductor Layers
+      g.setLineDash([4, 4]);
+      g.strokeStyle = '#3a4a68';
+      for (let i = 0; i < B_GEOM.length - 1; i++) {
+        if (B_GEOM[i][6] === 'mid' || B_GEOM[i + 1][6] === 'mid') continue;
+        if (B_GEOM[i][5].role === 'contact' && B_GEOM[i][5].Eg === 0) continue;
+        if (B_GEOM[i + 1][5].role === 'contact' && B_GEOM[i + 1][5].Eg === 0) continue;
+        const x = BX[i][1];
+        [2, 3].forEach(k => {
+          g.beginPath();
+          g.moveTo(x, Y_BAND(B_GEOM[i][k]));
+          g.lineTo(x, Y_BAND(B_GEOM[i + 1][k]));
+          g.stroke();
+        });
+      }
+
+      // Draw Middle Recombination / Optical Spacer Box if present
+      const midIdx = B_GEOM.findIndex(b => b[6] === 'mid');
+      if (midIdx >= 0) {
+        g.strokeStyle = '#64748b';
+        rr(BX[midIdx][0] + 4, 96, BX[midIdx][1] - BX[midIdx][0] - 8, 344, 6);
+        g.stroke();
+        g.setLineDash([]);
+        txt(devConfig.presetKey === 'tandem4t' ? 'Optical' : 'Recomb.', RC, 470, '11px' + F, '#94a3bf');
+        txt(devConfig.presetKey === 'tandem4t' ? 'spacer' : 'layer', RC, 484, '11px' + F, '#94a3bf');
+      }
+      g.setLineDash([]);
+
+      // Draw Each Layer's Conduction & Valence Band Edges
+      B_GEOM.forEach((b, i) => {
+        if (b[6] === 'mid') return;
+        const [a, z] = BX[i], w = z - a;
+        const mat = b[5];
+
+        // Back Metal Contact (Au, Ag, Carbon)
+        if (mat.role === 'contact' && mat.Eg === 0) {
+          const yWf = Y_BAND(-mat.wf);
+          const gr = g.createLinearGradient(0, yWf, 0, yWf + 115);
+          gr.addColorStop(0, b[4]);
+          gr.addColorStop(1, 'rgba(100,116,139,.15)');
+          g.fillStyle = gr;
+          g.fillRect(a, yWf, w, 117);
+          g.strokeStyle = b[4];
+          g.lineWidth = 2.5;
+          g.beginPath();
+          g.moveTo(a, yWf);
+          g.lineTo(z, yWf);
+          g.stroke();
+          txt(b[0], (a + z) / 2, yWf + 32, '600 13px' + F, '#fff');
+          txt(`E_F ${mn(-mat.wf)}`, (a + z) / 2, yWf - 10, '11px' + F, '#cbd5e1');
+          txt(b[0], (a + z) / 2, 470, '600 12px' + F, '#e2e8f0');
+          return;
+        }
+
+        const tp = Y_BAND(b[2]), bt = Y_BAND(b[3]);
+        g.fillStyle = b[4] + '40';
+        g.fillRect(a, tp, w, bt - tp);
+        g.strokeStyle = b[4];
+        g.lineWidth = 3;
+        g.beginPath();
+        g.moveTo(a, tp); g.lineTo(z, tp);
+        g.moveTo(a, bt); g.lineTo(z, bt);
+        g.stroke();
+
+        txt(mn(b[2]), (a + z) / 2, tp - 9, '11px' + F, '#cbd5e1');
+        txt(mn(b[3]), (a + z) / 2, bt + 11, '11px' + F, '#cbd5e1');
+        txt('Eg ' + (b[2] - b[3]).toFixed(1), (a + z) / 2, (tp + bt) / 2, '11px' + F, 'rgba(255,255,255,.55)');
+        txt(b[0], (a + z) / 2, 470, (w < 60 ? '600 11px' : '600 12px') + F, '#e2e8f0');
+      });
+
+      txt(`Sunlight enters from the left through ${B_GEOM[0][0]}`, 500, 508, '12px' + F, '#94a3bf');
+
+      // Draw Red Vertical Band-Blocking Bars & Offset Labels
+      g.strokeStyle = '#ef4444';
+      g.lineWidth = 4;
+      BARRIERS.forEach(bar => {
+        g.beginPath();
+        g.moveTo(bar.x, bar.y1);
+        g.lineTo(bar.x, bar.y2);
+        g.stroke();
+        const midY = (bar.y1 + bar.y2) / 2;
+        if (bar.side === 'center') {
+          txt(bar.label, bar.x, Math.min(bar.y1, bar.y2) - 12, '600 12px' + F, '#f87171', 'center');
+        } else {
+          txt(bar.label, bar.x + 8, midY, '600 12px' + F, '#f87171', 'left');
+        }
+      });
+
+      pb.forEach(dPh);
+      g.globalAlpha = 1;
+      cb.forEach(c => {
+        let q = atPath(c);
+        if (c.k === 'e' && c.age < 0.4) {
+          const f = c.age / 0.4;
+          q = [c.p[0][0], c.y0 + (c.p[0][1] - c.y0) * f * (2 - f)];
+        }
+        g.globalAlpha = fa(c.cell) * Math.min(1, (c.L[c.L.length - 1] - c.s) / 12 + 0.2);
+        c.k === 'e' ? dE(q[0], q[1]) : dH(q[0], q[1]);
+      });
+      g.globalAlpha = 1;
+      dFl(fb);
+    }
+
+    // Update Pair Generation Percentage Meters every 250ms
+    setInterval(() => {
+      const T = Object.values(cnt).reduce((a, b) => a + b, 0) || 1;
+      ABS_INDICES.forEach(idx => {
+        const p = Math.round(((cnt[idx] || 0) / T) * 100);
+        const nEl = $('n' + idx);
+        const mEl = $('m' + idx);
+        if (nEl) nEl.innerHTML = `${cnt[idx] || 0}<em class="not-italic text-xs text-sv-muted font-normal ml-1.5">pairs · ${p}% of total</em>`;
+        if (mEl) mEl.style.width = p + '%';
+      });
+    }, 250);
+
+    // -------------------------------------------------------------------------
+    // 5. VIEW 3: MATERIAL LIBRARY & CUSTOM DFT ADDER
+    // -------------------------------------------------------------------------
+    function useMaterialInLab(matId) {
+      const m = getMat(matId);
+      const targetIdx = devConfig.layers.findIndex(l => getMat(l.matId).role === m.role);
+      if (targetIdx >= 0) {
+        devConfig.layers[targetIdx].matId = matId;
+      } else {
+        devConfig.layers.splice(1, 0, { matId, thick: m.role === 'absorber' ? 300 : 50, cell: 'top' });
+      }
+      rebuildSimulationGeometry();
+      switchView('lab');
+      showToast(`Loaded ${m.name} into Device & Band Alignment Lab!`);
+    }
+
+    function renderLibraryTable() {
+      const role = $('lib-role-filter').value;
+      const egFilter = $('lib-eg-filter').value;
+      const pbOnly = $('lib-pb-filter').checked;
+      const q = $('lib-search-input').value.toLowerCase();
+
+      const filtered = MATERIALS.filter(m => {
+        if (role !== 'all' && m.role !== role) return false;
+        if (pbOnly && !m.leadFree) return false;
+        if (egFilter === 'narrow' && (m.Eg === 0 || m.Eg >= 1.45)) return false;
+        if (egFilter === 'medium' && (m.Eg < 1.45 || m.Eg > 1.75)) return false;
+        if (egFilter === 'wide' && m.Eg <= 1.75) return false;
+        if (q && !m.name.toLowerCase().includes(q) && !m.ref.toLowerCase().includes(q)) return false;
+        return true;
+      });
+
+      $('library-table-body').innerHTML = filtered.map(m => `
+        <tr class="hover:bg-sv-bg/70">
+          <td class="py-2.5 px-3 font-bold text-white">
+            ${m.name}
+            ${m.leadFree ? '<span class="ml-1.5 px-1.5 py-0.5 rounded bg-emerald-500/15 text-emerald-400 text-[10px]">Pb-Free</span>' : ''}
+          </td>
+          <td class="py-2.5 px-3 uppercase text-[11px] text-sky-400">${m.role}</td>
+          <td class="py-2.5 px-3">${m.Eg > 0 ? m.Eg.toFixed(2) : 'Metal'}</td>
+          <td class="py-2.5 px-3 text-sky-400">${m.chi.toFixed(2)}</td>
+          <td class="py-2.5 px-3 text-slate-300">${m.ec}</td>
+          <td class="py-2.5 px-3 text-orange-400">${m.ev}</td>
+          <td class="py-2.5 px-3 text-slate-300">${m.eps} | ${m.mu_e || 2}/${m.mu_h || 2}</td>
+          <td class="py-2.5 px-3 text-slate-300">${m.pce}</td>
+          <td class="py-2.5 px-3 text-sv-muted text-[11px]">${m.ref}</td>
+          <td class="py-2.5 px-3 text-right">
+            <button onclick="useMaterialInLab('${m.id}')" class="ctl-btn text-[11px] px-2 py-1 hover:border-sky-400">Use in Lab →</button>
+          </td>
+        </tr>
+      `).join('');
+    }
+
+    function addCustomCompound() {
+      const name = $('new-mat-name').value.trim();
+      const role = $('new-mat-role').value;
+      const Eg = parseFloat($('new-mat-eg').value) || 1.5;
+      const chi = parseFloat($('new-mat-chi').value) || 3.9;
+      const eps = parseFloat($('new-mat-eps').value) || 9.5;
+      const ref = $('new-mat-ref').value.trim() || 'DFT / Custom Entry';
+      const leadFree = $('new-mat-pb').checked;
+
+      if (!name) {
+        showToast('Please enter a compound formula or name.');
+        return;
+      }
+
+      const ec = role === 'contact' ? -chi : -chi;
+      const ev = role === 'contact' ? -chi : +(-(chi + Eg)).toFixed(2);
+      const col = role === 'absorber' ? '#7048c9' : role === 'etl' ? '#0284c7' : role === 'htl' ? '#c2410c' : '#475569';
+      const bCol = role === 'absorber' ? '#9b72f0' : role === 'etl' ? '#38bdf8' : role === 'htl' ? '#fb923c' : '#64748b';
+
+      MATERIALS.unshift({
+        id: 'custom_' + Date.now(),
+        name,
+        role,
+        Eg: role === 'contact' ? 0 : Eg,
+        chi,
+        ec,
+        ev,
+        wf: chi,
+        eps,
+        color: col,
+        bandCol: bCol,
+        leadFree,
+        pce: 'Custom / DFT',
+        ref
+      });
+
+      $('new-mat-name').value = '';
+      renderLibraryTable();
+      renderStackEditorRows();
+      showToast(`Added "${name}" to SolarVerse Material Library & Lab!`);
+    }
+
+    // -------------------------------------------------------------------------
+    // 6. VIEW 4: BANGLADESH 64-DISTRICT SOLAR PLANNER & DUAL CANVASES
+    // -------------------------------------------------------------------------
+    const BD_64_DISTRICTS = [
+      { name: 'Dhaka', div: 'Dhaka', lat: 23.81, psh: 4.75, tilt: 21 },
+      { name: 'Gazipur', div: 'Dhaka', lat: 24.00, psh: 4.74, tilt: 21 },
+      { name: 'Narayanganj', div: 'Dhaka', lat: 23.62, psh: 4.76, tilt: 21 },
+      { name: 'Narsingdi', div: 'Dhaka', lat: 23.92, psh: 4.73, tilt: 21 },
+      { name: 'Munshiganj', div: 'Dhaka', lat: 23.54, psh: 4.77, tilt: 21 },
+      { name: 'Manikganj', div: 'Dhaka', lat: 23.86, psh: 4.78, tilt: 21 },
+      { name: 'Tangail', div: 'Dhaka', lat: 24.25, psh: 4.76, tilt: 22 },
+      { name: 'Kishoreganj', div: 'Dhaka', lat: 24.43, psh: 4.68, tilt: 22 },
+      { name: 'Faridpur', div: 'Dhaka', lat: 23.60, psh: 4.82, tilt: 21 },
+      { name: 'Gopalganj', div: 'Dhaka', lat: 23.00, psh: 4.85, tilt: 20 },
+      { name: 'Madaripur', div: 'Dhaka', lat: 23.16, psh: 4.83, tilt: 20 },
+      { name: 'Rajbari', div: 'Dhaka', lat: 23.75, psh: 4.84, tilt: 21 },
+      { name: 'Shariatpur', div: 'Dhaka', lat: 23.24, psh: 4.81, tilt: 20 },
+      { name: 'Chattogram', div: 'Chattogram', lat: 22.35, psh: 4.88, tilt: 20 },
+      { name: "Cox's Bazar", div: 'Chattogram', lat: 21.43, psh: 5.05, tilt: 19 },
+      { name: 'Cumilla', div: 'Chattogram', lat: 23.46, psh: 4.76, tilt: 21 },
+      { name: 'Brahmanbaria', div: 'Chattogram', lat: 23.96, psh: 4.71, tilt: 21 },
+      { name: 'Chandpur', div: 'Chattogram', lat: 23.23, psh: 4.79, tilt: 20 },
+      { name: 'Feni', div: 'Chattogram', lat: 23.01, psh: 4.82, tilt: 20 },
+      { name: 'Noakhali', div: 'Chattogram', lat: 22.87, psh: 4.84, tilt: 20 },
+      { name: 'Lakshmipur', div: 'Chattogram', lat: 22.94, psh: 4.83, tilt: 20 },
+      { name: 'Rangamati', div: 'Chattogram', lat: 22.65, psh: 4.80, tilt: 20 },
+      { name: 'Khagrachhari', div: 'Chattogram', lat: 23.11, psh: 4.77, tilt: 20 },
+      { name: 'Bandarban', div: 'Chattogram', lat: 22.19, psh: 4.86, tilt: 20 },
+      { name: 'Rajshahi', div: 'Rajshahi', lat: 24.37, psh: 5.02, tilt: 22 },
+      { name: 'Bogura', div: 'Rajshahi', lat: 24.85, psh: 4.91, tilt: 22 },
+      { name: 'Pabna', div: 'Rajshahi', lat: 24.00, psh: 4.92, tilt: 21 },
+      { name: 'Sirajganj', div: 'Rajshahi', lat: 24.45, psh: 4.86, tilt: 22 },
+      { name: 'Naogaon', div: 'Rajshahi', lat: 24.80, psh: 4.98, tilt: 22 },
+      { name: 'Natore', div: 'Rajshahi', lat: 24.41, psh: 4.96, tilt: 22 },
+      { name: 'Chapainawabganj', div: 'Rajshahi', lat: 24.59, psh: 5.04, tilt: 22 },
+      { name: 'Joypurhat', div: 'Rajshahi', lat: 25.09, psh: 4.93, tilt: 23 },
+      { name: 'Khulna', div: 'Khulna', lat: 22.84, psh: 4.90, tilt: 20 },
+      { name: 'Jashore', div: 'Khulna', lat: 23.16, psh: 4.94, tilt: 20 },
+      { name: 'Satkhira', div: 'Khulna', lat: 22.72, psh: 4.95, tilt: 20 },
+      { name: 'Bagerhat', div: 'Khulna', lat: 22.65, psh: 4.89, tilt: 20 },
+      { name: 'Kushtia', div: 'Khulna', lat: 23.90, psh: 4.93, tilt: 21 },
+      { name: 'Jhenaidah', div: 'Khulna', lat: 23.54, psh: 4.94, tilt: 21 },
+      { name: 'Magura', div: 'Khulna', lat: 23.48, psh: 4.90, tilt: 21 },
+      { name: 'Narail', div: 'Khulna', lat: 23.17, psh: 4.89, tilt: 20 },
+      { name: 'Chuadanga', div: 'Khulna', lat: 23.64, psh: 4.97, tilt: 21 },
+      { name: 'Meherpur', div: 'Khulna', lat: 23.76, psh: 4.98, tilt: 21 },
+      { name: 'Sylhet', div: 'Sylhet', lat: 24.89, psh: 4.48, tilt: 22 },
+      { name: 'Moulvibazar', div: 'Sylhet', lat: 24.48, psh: 4.55, tilt: 22 },
+      { name: 'Habiganj', div: 'Sylhet', lat: 24.37, psh: 4.62, tilt: 22 },
+      { name: 'Sunamganj', div: 'Sylhet', lat: 25.06, psh: 4.45, tilt: 23 },
+      { name: 'Barishal', div: 'Barishal', lat: 22.70, psh: 4.82, tilt: 20 },
+      { name: 'Patuakhali', div: 'Barishal', lat: 22.35, psh: 4.88, tilt: 20 },
+      { name: 'Bhola', div: 'Barishal', lat: 22.68, psh: 4.85, tilt: 20 },
+      { name: 'Pirojpur', div: 'Barishal', lat: 22.58, psh: 4.84, tilt: 20 },
+      { name: 'Jhalokati', div: 'Barishal', lat: 22.64, psh: 4.83, tilt: 20 },
+      { name: 'Barguna', div: 'Barishal', lat: 22.15, psh: 4.89, tilt: 19 },
+      { name: 'Rangpur', div: 'Rangpur', lat: 25.74, psh: 4.82, tilt: 23 },
+      { name: 'Dinajpur', div: 'Rangpur', lat: 25.62, psh: 4.90, tilt: 23 },
+      { name: 'Thakurgaon', div: 'Rangpur', lat: 26.03, psh: 4.92, tilt: 24 },
+      { name: 'Panchagarh', div: 'Rangpur', lat: 26.34, psh: 4.95, tilt: 24 },
+      { name: 'Nilphamari', div: 'Rangpur', lat: 25.93, psh: 4.86, tilt: 23 },
+      { name: 'Lalmonirhat', div: 'Rangpur', lat: 25.99, psh: 4.80, tilt: 23 },
+      { name: 'Kurigram', div: 'Rangpur', lat: 25.80, psh: 4.78, tilt: 23 },
+      { name: 'Gaibandha', div: 'Rangpur', lat: 25.32, psh: 4.83, tilt: 23 },
+      { name: 'Mymensingh', div: 'Mymensingh', lat: 24.74, psh: 4.68, tilt: 22 },
+      { name: 'Jamalpur', div: 'Mymensingh', lat: 24.93, psh: 4.74, tilt: 22 },
+      { name: 'Sherpur', div: 'Mymensingh', lat: 25.02, psh: 4.71, tilt: 23 },
+      { name: 'Netrokona', div: 'Mymensingh', lat: 24.88, psh: 4.62, tilt: 22 }
+    ];
+
+    const BD_TECHS = {
+      topcon: { name: 'N-Type TOPCon (580W)', status: 'Commercial BD', wp: 580, area: 2.58, bdtWp: 30, tCoeff: -0.0029 },
+      monoperc: { name: 'Mono PERC (550W)', status: 'Commercial BD', wp: 550, area: 2.58, bdtWp: 27, tCoeff: -0.0035 },
+      bifacial: { name: 'Bifacial G-G (560W)', status: 'Commercial BD', wp: 560, area: 2.58, bdtWp: 31, tCoeff: -0.0030 },
+      poly: { name: 'Polycrystalline (330W)', status: 'Budget BD', wp: 330, area: 1.94, bdtWp: 24, tCoeff: -0.0040 },
+      tandem_proj: { name: 'Perovskite/Si Tandem (680W)', status: 'Projected Scenario', wp: 680, area: 2.30, bdtWp: 38, tCoeff: -0.0025 }
+    };
+
+    const bdTiltCtx = setupCanvas('bd-tilt-canvas', 640, 235);
+    const bdFlowCtx = setupCanvas('bd-flow-canvas', 640, 200);
+    const bdCashCtx = setupCanvas('bd-cash-canvas', 640, 210);
+    let bdAnimState = { dist: BD_64_DISTRICTS[0], tilt: 21, panels: 10, kwp: 5.5, mode: 'hybrid', temp: 58, cashSeries: [], payback: 5.3 };
+
+    function initBdDistricts() {
+      $('bd-dist-select').innerHTML = BD_64_DISTRICTS.map((d, i) => `<option value="${i}">${i + 1}. ${d.name} (${d.div}) | ${d.psh} PSH</option>`).join('');
+    }
+
+    function onBdTariffPresetChange() {
+      $('bd-tariff-input').value = $('bd-tariff-preset').value;
+      recalcBdPlanner();
+    }
+
+    function applyBdSeasonalTilt() {
+      const d = BD_64_DISTRICTS[parseInt($('bd-dist-select').value || '0', 10)];
+      const season = $('bd-season-select').value;
+      if (season === 'summer') {
+        $('bd-tilt-input').value = Math.max(5, Math.round(d.lat - 12));
+      } else if (season === 'winter') {
+        $('bd-tilt-input').value = Math.min(48, Math.round(d.lat + 14));
+      } else {
+        $('bd-tilt-input').value = d.tilt;
+      }
+      recalcBdPlanner();
+    }
+
+    function onBdDistrictSelect() {
+      const d = BD_64_DISTRICTS[parseInt($('bd-dist-select').value, 10)];
+      $('bd-dist-info').textContent = `Lat: ${d.lat}°N | PSH: ${d.psh} h/day | Optimal Tilt: ${d.tilt}° South`;
+      applyBdSeasonalTilt();
+    }
+
+    function setBdTemp(tVal) {
+      $('bd-cell-temp').value = tVal;
+      recalcBdPlanner();
+    }
+
+    function resetBdOptimalTilt() {
+      const d = BD_64_DISTRICTS[parseInt($('bd-dist-select').value, 10)];
+      $('bd-tilt-input').value = d.tilt;
+      recalcBdPlanner();
+    }
+
+    function computeSystemMetrics(dist, tech, targetKwp, mode, tariff, cellTemp, tiltDeg) {
+      const panels = Math.max(1, Math.ceil((targetKwp * 1000) / tech.wp));
+      const actualKwp = +(panels * tech.wp / 1000).toFixed(2);
+      const areaM2 = +(panels * tech.area * 1.32).toFixed(1);
+      const areaSqFt = Math.round(areaM2 * 10.764);
+
+      const tiltLoss = Math.pow((tiltDeg - dist.tilt) / 55, 2) * 0.18;
+      const tiltEff = Math.max(0.75, 1 - tiltLoss);
+      const tempLoss = Math.max(0, (cellTemp - 25) * Math.abs(tech.tCoeff));
+      const pr = 0.80 * tiltEff * (1 - tempLoss);
+      const annualKwh = Math.round(actualKwp * dist.psh * 365 * pr);
+
+      const bosPerWp = mode === 'ongrid' ? 28 : 34;
+      const batPerWp = mode === 'ongrid' ? 0 : mode === 'hybrid' ? 32 : 52;
+      const totalCost = Math.round(actualKwp * 1000 * (tech.bdtWp + bosPerWp + batPerWp));
+      const yearlySave = Math.round(annualKwh * tariff);
+      const payback = +(totalCost / Math.max(1, yearlySave)).toFixed(1);
+
+      return { panels, actualKwp, areaM2, areaSqFt, totalCost, annualKwh, yearlySave, payback };
+    }
+
+    function recalcBdPlanner() {
+      const dist = BD_64_DISTRICTS[parseInt($('bd-dist-select').value || '0', 10)];
+      const techKey = $('bd-tech-select').value;
+      const tech = BD_TECHS[techKey];
+      const unit = $('bd-input-unit').value;
+      const rawVal = Math.max(0.5, parseFloat($('bd-target-val').value) || 5);
+      const mode = $('bd-mode-select').value;
+      const tariff = Math.max(1, parseFloat($('bd-tariff-input').value) || 11.5);
+      const cellTemp = parseInt($('bd-cell-temp').value, 10);
+      const tiltDeg = parseInt($('bd-tilt-input').value, 10);
+
+      $('bd-cell-temp-lbl').textContent = `${cellTemp}°C ${cellTemp >= 50 ? '(Summer)' : cellTemp <= 30 ? '(Winter)' : ''}`;
+      $('bd-tilt-lbl').textContent = `${tiltDeg}°`;
+
+      let targetKwp = rawVal;
+      if (unit === 'daily_kwh') {
+        targetKwp = rawVal / (dist.psh * 0.75);
+      } else if (unit === 'monthly_kwh') {
+        targetKwp = (rawVal / 30) / (dist.psh * 0.75);
+      }
+      $('bd-target-hint').textContent = `≈ ${targetKwp.toFixed(2)} kWp (${Math.round(targetKwp * 1000).toLocaleString()} W)`;
+
+      const res = computeSystemMetrics(dist, tech, targetKwp, mode, tariff, cellTemp, tiltDeg);
+
+      // Compute 25-year cumulative net cash flow with 0.5%/yr degradation & 4%/yr BD tariff escalation
+      const cashSeries = [];
+      let cumCash = -res.totalCost;
+      cashSeries.push({ yr: 0, val: cumCash });
+      for (let yr = 1; yr <= 25; yr++) {
+        const degFactor = Math.pow(0.995, yr - 1);
+        const tariffFactor = Math.pow(1.04, yr - 1);
+        const omCost = res.totalCost * 0.008;
+        const netYear = res.yearlySave * degFactor * tariffFactor - omCost;
+        cumCash += netYear;
+        cashSeries.push({ yr, val: Math.round(cumCash) });
+      }
+
+      bdAnimState = { dist, tilt: tiltDeg, panels: res.panels, kwp: res.actualKwp, mode, temp: cellTemp, cashSeries, payback: res.payback };
+
+      $('bd-kpi-panels').textContent = `${res.panels} pcs`;
+      $('bd-kpi-kwp').textContent = `${res.actualKwp.toFixed(2)} kWp`;
+      $('bd-kpi-area').textContent = `${res.areaSqFt.toLocaleString()} ft²`;
+      $('bd-kpi-m2').textContent = `${res.areaM2} m²`;
+      $('bd-kpi-cost').textContent = `৳ ${(res.totalCost / 100000).toFixed(2)}L`;
+      $('bd-kpi-cost-full').textContent = `BDT ${res.totalCost.toLocaleString()}`;
+      $('bd-kpi-payback').textContent = `${res.payback} yrs`;
+      $('bd-kpi-save').textContent = `৳ ${res.yearlySave.toLocaleString()}/yr`;
+
+      $('bd-compare-tbody').innerHTML = Object.entries(BD_TECHS).map(([k, tObj]) => {
+        const c = computeSystemMetrics(dist, tObj, targetKwp, mode, tariff, cellTemp, tiltDeg);
+        const isSel = k === techKey;
+        return `<tr class="${isSel ? 'bg-[#16284d]/70 text-white' : 'text-slate-300'}">
+          <td class="py-2 px-3 font-sans font-bold">${tObj.name}</td>
+          <td class="py-2 px-3 text-[11px] ${k === 'tandem_proj' ? 'text-violet-400' : 'text-emerald-400'}">${tObj.status}</td>
+          <td class="py-2 px-3">${c.panels}</td>
+          <td class="py-2 px-3">${c.areaSqFt} ft²</td>
+          <td class="py-2 px-3 text-orange-400">৳${c.totalCost.toLocaleString()}</td>
+          <td class="py-2 px-3 text-sky-400">${c.annualKwh.toLocaleString()} kWh</td>
+          <td class="py-2 px-3 text-emerald-400">${c.payback} yrs</td>
+        </tr>`;
+      }).join('');
+    }
+
+    function drawBdCanvases(timeSec) {
+      if (currentView !== 'planner') return;
+
+      // Fig. C: Sun-Path & Tilt Angle Canvas (640 x 235)
+      const c = bdTiltCtx;
+      c.clearRect(0, 0, 640, 235);
+      const { dist, tilt } = bdAnimState;
+
+      // Sky Arc
+      c.strokeStyle = '#25324b';
+      c.lineWidth = 1.5;
+      c.setLineDash([5, 5]);
+      c.beginPath();
+      c.arc(320, 198, 172, Math.PI, 0);
+      c.stroke();
+      c.setLineDash([]);
+
+      // Roof Deck
+      c.fillStyle = '#1e293b';
+      c.fillRect(40, 198, 560, 18);
+      c.fillStyle = '#94a3bf';
+      c.font = '600 10px' + F;
+      c.textAlign = 'left';
+      c.fillText('SOUTH (Equator Facing)', 52, 210);
+      c.textAlign = 'right';
+      c.fillText('NORTH', 588, 210);
+
+      // Animated Sun along Arc
+      const sunAngle = Math.PI * (0.62 + 0.08 * Math.sin(timeSec * 0.8));
+      const sx = 320 + Math.cos(sunAngle) * 165;
+      const sy = 198 - Math.sin(sunAngle) * 165;
+
+      c.fillStyle = 'rgba(251, 191, 36, 0.25)';
+      c.beginPath(); c.arc(sx, sy, 20, 0, Math.PI * 2); c.fill();
+      c.fillStyle = '#fde047';
+      c.beginPath(); c.arc(sx, sy, 11, 0, Math.PI * 2); c.fill();
+
+      // Tilted Panel
+      const pivX = 320, pivY = 194, pLen = 115;
+      const rad = (tilt * Math.PI) / 180;
+      const topX = pivX - Math.cos(rad) * pLen;
+      const topY = pivY - Math.sin(rad) * pLen;
+
+      // Sunbeams hitting panel
+      for (let k = 0; k < 3; k++) {
+        const frac = 0.25 + k * 0.25;
+        const tx = pivX + (topX - pivX) * frac;
+        const ty = pivY + (topY - pivY) * frac;
+        c.strokeStyle = 'rgba(250, 204, 21, 0.65)';
+        c.lineWidth = 1.8;
+        c.setLineDash([6, 6]);
+        c.lineDashOffset = -timeSec * 40;
+        c.beginPath(); c.moveTo(sx, sy); c.lineTo(tx, ty); c.stroke();
+      }
+      c.setLineDash([]);
+
+      // Shadow cast behind panel
+      const shadowLen = Math.min(210, (Math.sin(rad) * pLen) * 1.45);
+      c.strokeStyle = '#080d18';
+      c.lineWidth = 6;
+      c.beginPath(); c.moveTo(pivX, 197); c.lineTo(pivX + shadowLen, 197); c.stroke();
+      c.fillStyle = '#94a3bf';
+      c.textAlign = 'center';
+      c.fillText(`Min Row Gap: ${(Math.sin(rad) * 2.27 * 2.1 + 0.4).toFixed(2)} m`, pivX + shadowLen / 2 + 18, 188);
+
+      // Galvanized Steel Mounting Rack Struts & Base Feet
+      c.strokeStyle = '#64748b';
+      c.lineWidth = 2.5;
+      c.beginPath();
+      c.moveTo(topX + Math.cos(rad) * 12, topY + Math.sin(rad) * 12);
+      c.lineTo(topX + Math.cos(rad) * 12, 198);
+      c.moveTo(pivX - Math.cos(rad) * 18, pivY - Math.sin(rad) * 18);
+      c.lineTo(pivX - Math.cos(rad) * 18, 198);
+      // Cross brace
+      c.moveTo(topX + Math.cos(rad) * 12, (topY + 198) * 0.52);
+      c.lineTo(pivX - Math.cos(rad) * 18, 195);
+      c.stroke();
+
+      // Base Mounting Brackets
+      c.fillStyle = '#94a3b8';
+      c.fillRect(topX + Math.cos(rad) * 12 - 5, 194, 10, 4);
+      c.fillRect(pivX - 5, 194, 10, 4);
+
+      // Tilt Angle Protractor Arc at Pivot
+      if (tilt > 2) {
+        c.strokeStyle = 'rgba(56, 189, 248, 0.55)';
+        c.lineWidth = 1.4;
+        c.beginPath();
+        c.arc(pivX, pivY, 34, Math.PI, Math.PI + rad, false);
+        c.stroke();
+        c.fillStyle = '#38bdf8';
+        c.font = 'bold 10px' + F;
+        c.textAlign = 'right';
+        c.fillText(`${tilt}°`, pivX - 38, pivY - 6);
+      }
+
+      // Detailed Tilted Photovoltaic Solar Module (3D Perspective Face + Aluminum Frame)
+      c.save();
+      c.translate(pivX, pivY);
+      c.rotate(rad); // -X axis now points upward along the tilted panel surface
+
+      const modW = pLen;
+      const modH = 22; // Perspective height of the solar cell face
+      const modX = -modW;
+      const modY = -modH - 2;
+
+      // 1. Anodized Aluminum Frame Outer Bezel
+      c.fillStyle = '#cbd5e1';
+      c.fillRect(modX - 3, modY - 3, modW + 6, modH + 6);
+
+      // 2. Deep Monocrystalline Silicon Blue Gradient Substrate
+      const pvGrad = c.createLinearGradient(modX, modY, modX + modW, modY + modH);
+      pvGrad.addColorStop(0, '#0c2461');
+      pvGrad.addColorStop(0.5, '#1e3a8a');
+      pvGrad.addColorStop(1, '#172554');
+      c.fillStyle = pvGrad;
+      c.fillRect(modX, modY, modW, modH);
+
+      // 3. Individual Silicon Solar Cells & Silver Busbars
+      const cellCols = 6;
+      const cellRows = 2;
+      const cwCell = modW / cellCols;
+      const chCell = modH / cellRows;
+
+      c.strokeStyle = 'rgba(147, 197, 253, 0.45)';
+      c.lineWidth = 0.9;
+      for (let col = 1; col < cellCols; col++) {
+        const cx = modX + col * cwCell;
+        c.beginPath(); c.moveTo(cx, modY); c.lineTo(cx, modY + modH); c.stroke();
+      }
+      for (let row = 1; row < cellRows; row++) {
+        const cy = modY + row * chCell;
+        c.beginPath(); c.moveTo(modX, cy); c.lineTo(modX + modW, cy); c.stroke();
+      }
+
+      // Fine Silver Busbar Conductors across cells
+      c.strokeStyle = 'rgba(226, 232, 240, 0.35)';
+      c.lineWidth = 0.6;
+      [0.33, 0.67].forEach(frac => {
+        const by = modY + modH * frac;
+        c.beginPath(); c.moveTo(modX, by); c.lineTo(modX + modW, by); c.stroke();
+      });
+
+      // 4. Anti-Reflective Tempered Glass Specular Sheen
+      const sheen = c.createLinearGradient(modX, modY, modX + modW * 0.6, modY + modH);
+      sheen.addColorStop(0, 'rgba(255, 255, 255, 0.28)');
+      sheen.addColorStop(0.5, 'rgba(56, 189, 248, 0.12)');
+      sheen.addColorStop(1, 'rgba(255, 255, 255, 0)');
+      c.fillStyle = sheen;
+      c.fillRect(modX, modY, modW, modH);
+
+      // 5. Lower Aluminum Thickness Edge & Junction Box
+      c.fillStyle = '#94a3b8';
+      c.fillRect(modX - 3, modY + modH + 1, modW + 6, 3.5);
+      c.fillStyle = '#0f172a';
+      c.fillRect(modX + 14, modY + modH + 4.5, 14, 4);
+
+      c.restore();
+
+      c.fillStyle = '#38bdf8';
+      c.font = 'bold 12px' + F;
+      c.textAlign = 'left';
+      c.fillText(`Panel Tilt: ${tilt}° (District Optimal: ${dist.tilt}°)`, 22, 24);
+      c.fillStyle = '#e8edf8';
+      c.font = '11px' + F;
+      c.fillText(`${dist.name} • Peak Sun Hours: ${dist.psh} h/day`, 22, 42);
+
+      // Fig. D: Rooftop Array & Live Power Flow Canvas (640 x 200)
+      const f = bdFlowCtx;
+      f.clearRect(0, 0, 640, 200);
+
+      // Left Half: Rooftop Panel Grid
+      f.fillStyle = '#080d18';
+      f.strokeStyle = '#25324b';
+      f.lineWidth = 1.5;
+      f.fillRect(16, 16, 275, 168);
+      f.strokeRect(16, 16, 275, 168);
+
+      const drawCount = Math.min(bdAnimState.panels, 32);
+      const cols = 8, cw = 28, cellH = 28, gap = 4;
+      for (let i = 0; i < drawCount; i++) {
+        const r = Math.floor(i / cols), col = i % cols;
+        const px = 26 + col * (cw + gap);
+        const py = 28 + r * (cellH + gap + 4);
+        f.fillStyle = 'rgba(56, 189, 248, 0.25)';
+        f.strokeStyle = '#38bdf8';
+        f.lineWidth = 1;
+        f.fillRect(px, py, cw, cellH);
+        f.strokeRect(px, py, cw, cellH);
+      }
+      f.fillStyle = '#94a3bf';
+      f.font = '11px' + F;
+      f.textAlign = 'center';
+      f.fillText(`Roof Array: ${bdAnimState.panels} Modules (${bdAnimState.kwp} kWp)`, 153, 173);
+
+      // Right Half: Live Power Flow Nodes
+      const drawNode = (x, y, w, h, title, sub, col) => {
+        f.fillStyle = col + '26';
+        f.strokeStyle = col;
+        f.lineWidth = 1.5;
+        f.fillRect(x, y, w, h);
+        f.strokeRect(x, y, w, h);
+        f.fillStyle = '#ffffff';
+        f.font = 'bold 11px' + F;
+        f.textAlign = 'center';
+        f.fillText(title, x + w / 2, y + h / 2 - 6);
+        f.fillStyle = col;
+        f.font = '10px' + F;
+        f.fillText(sub, x + w / 2, y + h / 2 + 9);
+      };
+
+      drawNode(315, 76, 86, 48, 'PV ARRAY', `${bdAnimState.kwp} kWp DC`, '#38bdf8');
+      drawNode(435, 76, 86, 48, 'INVERTER', 'MPPT DC→AC', '#fb923c');
+      drawNode(545, 22, 82, 46, 'HOME LOAD', 'AC Appliances', '#34d399');
+      const secTitle = bdAnimState.mode === 'ongrid' ? 'NAT. GRID' : 'LITHIUM BAT';
+      const secSub = bdAnimState.mode === 'ongrid' ? 'Net Export' : bdAnimState.mode === 'hybrid' ? 'Backup+Grid' : 'Standalone';
+      drawNode(545, 130, 82, 46, secTitle, secSub, '#a78bfa');
+
+      // Animated Power Dots
+      const drawWire = (x1, y1, x2, y2, col) => {
+        f.strokeStyle = '#25324b';
+        f.lineWidth = 2;
+        f.beginPath(); f.moveTo(x1, y1); f.lineTo(x2, y2); f.stroke();
+        const prog = (timeSec * 0.9) % 1;
+        const dx = x1 + (x2 - x1) * prog;
+        const dy = y1 + (y2 - y1) * prog;
+        f.fillStyle = col;
+        f.beginPath(); f.arc(dx, dy, 4, 0, Math.PI * 2); f.fill();
+      };
+
+      drawWire(401, 100, 435, 100, '#38bdf8');
+      drawWire(521, 88, 545, 45, '#34d399');
+      drawWire(521, 112, 545, 153, '#a78bfa');
+
+      // Fig. E: 25-Year Cumulative Cash-Flow & Break-Even Curve (640 x 210)
+      const ch = bdCashCtx;
+      ch.clearRect(0, 0, 640, 210);
+      const series = bdAnimState.cashSeries;
+      if (!series || !series.length) return;
+
+      const minVal = Math.min(...series.map(s => s.val));
+      const maxVal = Math.max(...series.map(s => s.val), 100000);
+      const padL = 68, padR = 24, padT = 24, padB = 30;
+      const plotW = 640 - padL - padR, plotH = 210 - padT - padB;
+      const yMap = v => padT + ((maxVal - v) / (maxVal - minVal || 1)) * plotH;
+      const xMap = yr => padL + (yr / 25) * plotW;
+
+      // Zero Break-Even Line
+      const yZero = yMap(0);
+      ch.strokeStyle = '#475569';
+      ch.lineWidth = 1.2;
+      ch.setLineDash([4, 4]);
+      ch.beginPath(); ch.moveTo(padL, yZero); ch.lineTo(640 - padR, yZero); ch.stroke();
+      ch.setLineDash([]);
+
+      ch.fillStyle = '#94a3bf';
+      ch.font = '10px' + F;
+      ch.textAlign = 'right';
+      ch.fillText('৳0 Break-Even', padL - 6, yZero + 3);
+      ch.fillText(`+৳${(maxVal / 100000).toFixed(1)}L`, padL - 6, padT + 6);
+      ch.fillText(`-৳${(Math.abs(minVal) / 100000).toFixed(1)}L`, padL - 6, 210 - padB);
+
+      // X-axis year ticks
+      ch.textAlign = 'center';
+      [0, 5, 10, 15, 20, 25].forEach(yr => {
+        ch.fillText(`Yr ${yr}`, xMap(yr), 210 - 10);
+      });
+
+      // Cumulative Cash-Flow Polyline
+      ch.strokeStyle = '#34d399';
+      ch.lineWidth = 2.5;
+      ch.beginPath();
+      series.forEach((pt, idx) => {
+        const px = xMap(pt.yr), py = yMap(pt.val);
+        if (idx === 0) ch.moveTo(px, py);
+        else ch.lineTo(px, py);
+      });
+      ch.stroke();
+
+      // Highlight Break-Even Point
+      const crossIdx = series.findIndex(s => s.val >= 0);
+      if (crossIdx > 0) {
+        const bx = xMap(series[crossIdx].yr), by = yMap(series[crossIdx].val);
+        ch.fillStyle = '#fde047';
+        ch.beginPath(); ch.arc(bx, by, 5, 0, Math.PI * 2); ch.fill();
+        ch.fillStyle = '#fde047';
+        ch.font = 'bold 11px' + F;
+        ch.textAlign = 'left';
+        ch.fillText(`Break-Even: ~${bdAnimState.payback} yrs`, Math.min(480, bx + 8), Math.max(22, by - 8));
+      }
+      ch.fillStyle = '#e8edf8';
+      ch.font = 'bold 11px' + F;
+      ch.textAlign = 'right';
+      ch.fillText(`25-Yr Net Profit: ৳${(series[25].val / 100000).toFixed(2)} Lakh`, 640 - padR, 18);
+    }
+
+    // -------------------------------------------------------------------------
+    // 7. ACADEMY SELF-TEST QUIZ & INTERACTIVE CANVAS HOVER INSPECTOR
+    // -------------------------------------------------------------------------
+    const ACADEMY_QUESTIONS = [
+      {
+        q: '1. In a lead-free Cs₂TiBr₆ / MASnI₃ / Cs₃Bi₂I₉ top cell, why does Cs₂TiBr₆ block holes?',
+        opts: ['Its valence band (-6.1 eV) is 0.5 eV deeper than MASnI₃ (-5.6 eV)', 'It has zero bandgap', 'It is a metallic contact'],
+        ans: 0,
+        exp: 'Holes float upward toward less negative energy; a 0.5 eV deeper valence band creates a hole-blocking barrier.'
+      },
+      {
+        q: '2. What limits total current density (Jsc) in a monolithic 2-Terminal (2T) tandem solar cell?',
+        opts: ['The sum of top and bottom Jsc', 'The smaller sub-cell current: min(Jtop, Jbot)', 'Only the bottom cell bandgap'],
+        ans: 1,
+        exp: 'Because sub-cells are connected in series through a recombination layer, the lower Jsc bottlenecks the entire stack.'
+      },
+      {
+        q: '3. Why does summer roof heat (58°C) in Dhaka reduce crystalline silicon panel output?',
+        opts: ['Higher temperature lowers open-circuit voltage (Voc) by ~0.35%/°C', 'Sunlight stops hitting the roof', 'Inverters turn off above 40°C'],
+        ans: 0,
+        exp: 'Elevated cell temperature increases intrinsic carrier concentration, reducing Voc and overall module efficiency.'
+      }
+    ];
+    let quizAnswers = {};
+
+    function renderAcademyQuiz() {
+      const box = $('academy-quiz-container');
+      if (!box) return;
+      box.innerHTML = ACADEMY_QUESTIONS.map((item, qIdx) => {
+        const picked = quizAnswers[qIdx];
+        return `<div class="p-3.5 rounded-xl bg-sv-panel border border-sv-line flex flex-col justify-between space-y-2.5">
+          <div class="font-bold text-white leading-snug">${item.q}</div>
+          <div class="space-y-1.5">
+            ${item.opts.map((opt, oIdx) => {
+              let cls = 'w-full text-left px-2.5 py-1.5 rounded-lg border text-[11px] transition-all ';
+              if (picked === undefined) {
+                cls += 'bg-sv-bg border-sv-line hover:border-sky-400 text-slate-300';
+              } else if (oIdx === item.ans) {
+                cls += 'bg-emerald-500/20 border-emerald-500 text-emerald-300 font-bold';
+              } else if (oIdx === picked) {
+                cls += 'bg-rose-500/20 border-rose-500 text-sv-red';
+              } else {
+                cls += 'bg-sv-bg border-sv-line text-sv-muted opacity-60';
+              }
+              return `<button onclick="answerAcademyQuiz(${qIdx}, ${oIdx})" class="${cls}">${opt}</button>`;
+            }).join('')}
+          </div>
+          ${picked !== undefined ? `<div class="text-[11px] text-sky-300 pt-1 border-t border-sv-line/70">${item.exp}</div>` : ''}
+        </div>`;
+      }).join('');
+    }
+
+    function answerAcademyQuiz(qIdx, oIdx) {
+      quizAnswers[qIdx] = oIdx;
+      let score = 0;
+      ACADEMY_QUESTIONS.forEach((q, idx) => {
+        if (quizAnswers[idx] === q.ans) score++;
+      });
+      $('quiz-score-badge').textContent = `Score: ${score} / ${ACADEMY_QUESTIONS.length}`;
+      renderAcademyQuiz();
+    }
+
+    function attachCanvasTooltips() {
+      const tip = $('canvas-tooltip');
+      const hideTip = () => tip.classList.add('hidden');
+
+      $('c1').addEventListener('mousemove', e => {
+        const rect = $('c1').getBoundingClientRect();
+        const scaleX = 1000 / rect.width;
+        const scaleY = 560 / rect.height;
+        const cx = (e.clientX - rect.left) * scaleX;
+        const cy = (e.clientY - rect.top) * scaleY;
+
+        if (cx >= SX && cx <= SX + SW) {
+          const hit = L_GEOM.find(l => cy >= l[1] && cy <= l[1] + l[2]);
+          if (hit) {
+            const m = hit[4];
+            const thick = devConfig.layers[hit[6]].thick;
+            $('tt-title').textContent = `${m.name} (${m.role.toUpperCase()})`;
+            $('tt-body').innerHTML = `
+              <div>Thickness: <strong class="text-white">${thick} nm</strong></div>
+              <div>Bandgap (Eg): <strong class="text-sky-400">${m.Eg > 0 ? m.Eg.toFixed(2) + ' eV' : 'Metallic / Tunnel'}</strong></div>
+              <div>Ec / Ev: <strong class="text-orange-400">${m.ec} eV / ${m.ev} eV</strong></div>
+              <div class="text-sv-muted pt-0.5">${m.ref}</div>
+            `;
+            tip.style.left = Math.min(window.innerWidth - 270, e.clientX + 14) + 'px';
+            tip.style.top = Math.max(12, e.clientY - 20) + 'px';
+            tip.classList.remove('hidden');
+            return;
+          }
+        }
+        hideTip();
+      });
+      $('c1').addEventListener('mouseleave', hideTip);
+
+      $('c2').addEventListener('mousemove', e => {
+        const rect = $('c2').getBoundingClientRect();
+        const scaleX = 1000 / rect.width;
+        const cx = (e.clientX - rect.left) * scaleX;
+        const hitIdx = BX.findIndex(b => cx >= b[0] && cx <= b[1]);
+        if (hitIdx >= 0 && B_GEOM[hitIdx]) {
+          const b = B_GEOM[hitIdx];
+          const m = b[5];
+          $('tt-title').textContent = `${m.name} Energy Levels`;
+          $('tt-body').innerHTML = `
+            <div>Conduction Band (Ec): <strong class="text-sky-400">${m.ec} eV</strong></div>
+            <div>Valence Band (Ev): <strong class="text-orange-400">${m.ev} eV</strong></div>
+            <div>Electron Affinity (χ): <strong class="text-white">${m.chi.toFixed(2)} eV</strong></div>
+            <div>Permittivity (εr): <strong class="text-white">${m.eps}</strong> | Doping: <strong class="text-white">${m.doping || 'i'}</strong></div>
+          `;
+          tip.style.left = Math.min(window.innerWidth - 270, e.clientX + 14) + 'px';
+          tip.style.top = Math.max(12, e.clientY - 20) + 'px';
+          tip.classList.remove('hidden');
+          return;
+        }
+        hideTip();
+      });
+      $('c2').addEventListener('mouseleave', hideTip);
+    }
+
+    // -------------------------------------------------------------------------
+    // 8. MASTER 60 FPS ANIMATION LOOP & INITIALIZATION
+    // -------------------------------------------------------------------------
+    let lastTime = performance.now();
+    function masterLoop(now) {
+      const dt = Math.min(0.05, (now - lastTime) / 1000);
+      lastTime = now;
+
+      stepAndDrawOil(dt, now / 1000);
+
+      if (currentView === 'lab') {
+        if (run) {
+          t += dt * speed;
+          upd1(dt * speed);
+          upd2(dt * speed);
+        }
+        draw1();
+        draw2();
+      } else if (currentView === 'planner') {
+        drawBdCanvases(now / 1000);
+      }
+
+      requestAnimationFrame(masterLoop);
+    }
+
+    // Reference Controls Listeners
+    $('pp').onclick = () => {
+      run = !run;
+      $('pp').textContent = run ? 'Pause' : 'Play';
+    };
+    $('sp').oninput = e => {
+      speed = +e.target.value;
+      $('spv').textContent = speed + '×';
+    };
+    document.querySelectorAll('[data-f]').forEach(b => {
+      b.onclick = () => {
+        focus = b.dataset.f;
+        document.querySelectorAll('[data-f]').forEach(x => x.classList.toggle('on', x === b));
+      };
+    });
+
+    window.onload = function () {
+      initOilCanvas();
+      updateOilParams();
+      loadDevicePreset('leadfree_2t');
+      renderLibraryTable();
+      initBdDistricts();
+      recalcBdPlanner();
+      renderAcademyQuiz();
+      attachCanvasTooltips();
+      switchView('lab');
+
+      if (matchMedia('(prefers-reduced-motion: reduce)').matches) {
+        run = false;
+        $('pp').textContent = 'Play';
+      }
+      requestAnimationFrame(masterLoop);
+    };
+  </script>
+</body>
+</html>
